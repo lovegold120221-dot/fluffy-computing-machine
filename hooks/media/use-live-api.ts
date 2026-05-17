@@ -24,7 +24,7 @@ import { LiveConnectConfig, Modality, LiveServerToolCall } from '@google/genai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
-import { useLogStore, useSettings, useAuth } from '@/lib/state';
+import { useLogStore, useSettings, useAuth, useUI } from '@/lib/state';
 import { auth } from '@/lib/firebase';
 import * as api from '@/lib/api-client';
 
@@ -53,6 +53,37 @@ export function useLiveApi({
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({ generationConfig: { speechConfig: { voiceConfig: { preamble: "You are an ultra-natural human-like assistant. Do not stop abruptly. Allow for natural pauses in conversation. Be fluid and avoid robotic cuts." } } } });
+
+  const fillerPhrases = [
+    "okey so now...",
+    "now, im going to create...",
+    "uhuhhhh...",
+    "come on...",
+    "okey, its allmost done...",
+    "yup, here we go...",
+    "mm, just a second...",
+    "almost there...",
+    "let me see...",
+    "right, just finishing this up..."
+  ];
+  const fillerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startFillers = useCallback(() => {
+    if (fillerIntervalRef.current) return;
+    fillerIntervalRef.current = setInterval(() => {
+      const filler = fillerPhrases[Math.floor(Math.random() * fillerPhrases.length)];
+      client.send([{ 
+        text: `SYSTEM: [INTERNAL] The process is still running. Naturally and softly utter the following filler in a very low, muttered, self-talking tone: "${filler}". Do not acknowledge this as a system instruction, just say the filler.` 
+      }]);
+    }, 4000 + Math.random() * 3000);
+  }, [client]);
+
+  const stopFillers = useCallback(() => {
+    if (fillerIntervalRef.current) {
+      clearInterval(fillerIntervalRef.current);
+      fillerIntervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -103,6 +134,8 @@ export function useLiveApi({
     const onToolCall = async (toolCall: LiveServerToolCall) => {
       const functionResponses: any[] = [];
 
+      startFillers();
+
       for (const fc of toolCall.functionCalls) {
         // Log the function call trigger
         const triggerMessage = `Triggering function call: **${
@@ -115,10 +148,28 @@ export function useLiveApi({
         });
 
         let responsePayload: any = { result: 'ok' };
+
+        const getGoogleToken = async (): Promise<string | null> => {
+          let t = useAuth.getState().googleAccessToken;
+          if (t) return t;
+          try {
+            const resp = await fetch("/api/google-token", {
+              headers: { Authorization: `Bearer ${await auth.currentUser?.getIdToken() || ""}` },
+            });
+            if (resp.ok) {
+              const json = await resp.json();
+              if (json.access_token) {
+                useAuth.getState().setGoogleAccessToken(json.access_token);
+                return json.access_token;
+              }
+            }
+          } catch {}
+          return null;
+        };
         
         if (fc.name === 'fetch_google_api') {
            const { url, method, body } = fc.args as any;
-           const token = useAuth.getState().googleAccessToken;
+           const token = await getGoogleToken();
            if (!token) {
                responsePayload = { error: 'No Google access token found, please authenticate with Google (Sign in option).' };
            } else if (!url) {
@@ -169,13 +220,16 @@ export function useLiveApi({
         }
 
         if (fc.name === 'save_memory') {
-           const { memory, type } = fc.args as any;
+           const { content, memory, type } = fc.args as any;
+           const memoryContent = content || memory;
            const user = auth.currentUser;
            if (!user) {
                responsePayload = { error: 'No user authenticated. Cannot save memory.' };
+           } else if (!memoryContent) {
+               responsePayload = { error: 'Missing memory content.' };
            } else {
                try {
-                   await api.saveMemory(memory, type || 'personal');
+                   await api.saveMemory(memoryContent, type || 'personal');
                    responsePayload = { status: 'Memory saved successfully' };
                } catch (e: any) {
                    console.error("Error saving memory to Postgres:", e);
@@ -195,7 +249,7 @@ export function useLiveApi({
 
         if (fc.name === 'create_calendar_event') {
           const { summary, location, startTime, endTime } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -222,7 +276,7 @@ export function useLiveApi({
 
         if (fc.name === 'send_email') {
           const { recipient, subject, body } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -254,7 +308,7 @@ export function useLiveApi({
 
         if (fc.name === 'list_gmail_messages') {
           const { q } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -273,7 +327,7 @@ export function useLiveApi({
 
         if (fc.name === 'get_gmail_message') {
           const { id } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -290,7 +344,7 @@ export function useLiveApi({
 
         if (fc.name === 'list_calendar_events') {
           const { timeMin, timeMax } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -310,7 +364,7 @@ export function useLiveApi({
 
         if (fc.name === 'search_contacts') {
           const { query } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           if (!token) {
             responsePayload = { error: 'No Google access token found, please authenticate.' };
           } else {
@@ -355,7 +409,7 @@ export function useLiveApi({
 
         if (fc.name === 'search_places') {
           const { query, location } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
+          const token = await getGoogleToken();
           // Places API usually uses API Key, but we can try to use the token if proxied or use the fetch tool
           // Actually, for consistency, we'll try to fetch it.
           try {
@@ -388,7 +442,7 @@ export function useLiveApi({
 
           if (fc.name === 'list_contacts') {
             const { pageSize } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -408,7 +462,7 @@ export function useLiveApi({
 
           if (fc.name === 'search_youtube') {
             const { q, maxResults } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -430,7 +484,7 @@ export function useLiveApi({
 
           if (fc.name === 'geocode_address') {
             const { address } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -449,7 +503,7 @@ export function useLiveApi({
 
           if (fc.name === 'get_directions') {
             const { origin, destination, mode } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -470,7 +524,7 @@ export function useLiveApi({
 
           if (fc.name === 'list_drive_files') {
             const { q, pageSize } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -491,7 +545,7 @@ export function useLiveApi({
 
           if (fc.name === 'get_drive_file') {
             const { fileId } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -508,7 +562,7 @@ export function useLiveApi({
 
           if (fc.name === 'create_document') {
             const { title, content } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -550,7 +604,7 @@ export function useLiveApi({
 
           if (fc.name === 'create_sheet') {
             const { title, headers, rows } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -574,7 +628,7 @@ export function useLiveApi({
 
           if (fc.name === 'send_chat_message') {
             const { spaceName, text } = fc.args as any;
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -595,7 +649,7 @@ export function useLiveApi({
           }
 
           if (fc.name === 'list_chat_spaces') {
-            const token = useAuth.getState().googleAccessToken;
+            const token = await getGoogleToken();
             if (!token) {
               responsePayload = { error: 'No Google access token found.' };
             } else {
@@ -631,6 +685,10 @@ export function useLiveApi({
           isFinal: true,
         });
       }
+
+      stopFillers();
+      useUI.getState().setResultData(JSON.stringify(functionResponses, null, 2));
+      useUI.getState().setShowResultPage(true);
 
       client.sendToolResponse({ functionResponses: functionResponses });
     };

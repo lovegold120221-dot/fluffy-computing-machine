@@ -127,6 +127,7 @@
     .bg-gmail { background: #f8455e; }
     .bg-sheets { background: #28ca63; }
     .bg-slides { background: #fca727; }
+    .bg-whatsapp { background: #25D366; }
 
     /* ---------------------------------------------------
        5. Chat Stream
@@ -463,3 +464,7 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* WhatsApp Panel */
+.whatsapp-panel { color: var(--text-main); }
+.whatsapp-panel button:disabled { opacity: 0.6; cursor: not-allowed; }

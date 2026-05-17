@@ -2,7 +2,9 @@ import { auth } from "./firebase";
 
 async function getHeaders() {
   const user = auth.currentUser;
-  if (!user) return {};
+  if (!user) {
+    throw new Error("No authenticated Firebase user.");
+  }
   const token = await user.getIdToken();
   return {
     "Content-Type": "application/json",
@@ -15,6 +17,15 @@ async function readApiError(res: Response, fallback: string) {
   if (errData?.error?.message) return errData.error.message;
   if (typeof errData?.error === "string") return errData.error;
   return fallback;
+}
+
+export async function fetchCurrentUser() {
+  const headers = await getHeaders();
+  const res = await fetch("/api/me", { headers });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to fetch current user"));
+  }
+  return res.json();
 }
 
 export async function fetchSettings() {
@@ -71,21 +82,48 @@ export async function deleteMemory(id: number) {
   return res.json();
 }
 
-export async function fetchConversations(limit = 100) {
+export async function fetchConversations(limit = 100, options: { session_id?: string; q?: string } = {}) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/conversations?limit=${limit}`, { headers });
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (options.session_id) params.set("session_id", options.session_id);
+  if (options.q) params.set("q", options.q);
+  const res = await fetch(`/api/conversations?${params.toString()}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch conversations"));
   }
   return res.json();
 }
 
-export async function saveConversationTurn(role: string, content: string, session_id?: string) {
+export async function fetchConversationContext(limit = 60) {
   const headers = await getHeaders();
+  const res = await fetch(`/api/conversations/context?limit=${encodeURIComponent(String(limit))}`, { headers });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to fetch conversation context"));
+  }
+  return res.json();
+}
+
+export type ConversationSource = "voice" | "text" | "tool" | "system" | "import";
+
+export type ConversationTurnInput = {
+  session_id?: string;
+  client_turn_id?: string;
+  source?: ConversationSource;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+};
+
+export async function saveConversationTurn(
+  role: string,
+  content: string,
+  options?: string | ConversationTurnInput
+) {
+  const headers = await getHeaders();
+  const normalizedOptions = typeof options === "string" ? { session_id: options } : (options || {});
   const res = await fetch("/api/conversations", {
     method: "POST",
     headers,
-    body: JSON.stringify({ role, content, session_id })
+    body: JSON.stringify({ role, content, ...normalizedOptions })
   });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to save turn"));
@@ -284,5 +322,74 @@ export async function fetchAutomationRuns(id: string) {
   const headers = await getHeaders();
   const res = await fetch(`/api/automations/${id}/runs`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automation runs"));
+  return res.json();
+}
+
+// ── Google Token Persistence (Supabase) ──
+
+export async function saveGoogleToken(accessToken: string, expiresAt?: number) {
+  const headers = await getHeaders();
+  const res = await fetch("/api/google-token", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ access_token: accessToken, expires_at: expiresAt }),
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to save Google token"));
+  return res.json();
+}
+
+export async function fetchGoogleToken(): Promise<{ access_token: string; expires_at?: number }> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/google-token", { headers });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch Google token"));
+  return res.json();
+}
+
+// ── WhatsApp Integration ──
+
+export async function connectWhatsApp(): Promise<{
+  status: string;
+  instanceName: string;
+  qrBase64?: string;
+  pairingCode?: string;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/connect", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to connect WhatsApp"));
+  return res.json();
+}
+
+export async function fetchWhatsAppStatus(): Promise<{
+  status: string;
+  instanceName: string | null;
+  phoneNumber?: string;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/status", { headers });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch WhatsApp status"));
+  return res.json();
+}
+
+export async function sendWhatsAppMessage(number: string, text: string) {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/send", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ number, text }),
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to send WhatsApp message"));
+  return res.json();
+}
+
+export async function disconnectWhatsApp() {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/disconnect", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to disconnect WhatsApp"));
   return res.json();
 }

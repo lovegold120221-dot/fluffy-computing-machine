@@ -11,7 +11,27 @@ import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, create
 import * as api from './lib/api-client';
 import { useAuth } from './lib/state';
 import AutomationPanel from './components/AutomationPanel';
+import WhatsAppConnectPanel from './components/WhatsAppConnectPanel';
 
+type PersistedConversationRole = 'user' | 'agent' | 'system';
+type PersistedConversationSource = 'voice' | 'text' | 'tool' | 'system' | 'import';
+
+const makeSessionId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const makeStableHash = (value: string) => {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) + hash) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const normalizeTurnText = (value: string) => value.replace(/\s+/g, ' ').trim();
 
 export default function EburonApp() {
   const [isAuthOpen, setIsAuthOpen] = useState(true);
@@ -39,6 +59,10 @@ export default function EburonApp() {
   const activeWorkspaceResult = useUI((state) => state.activeWorkspaceResult);
   const setActiveWorkspaceResult = useUI((state) => state.setActiveWorkspaceResult);
 
+  const {
+    showResultPage, setShowResultPage,
+    resultData, setResultData
+  } = useUI();
   const [micState, setMicState] = useState(false);
   const [clientVolume, setClientVolume] = useState(0);
   const [audioRecorder] = useState(() => new AudioRecorder());
@@ -92,9 +116,12 @@ export default function EburonApp() {
   const [newMemoryValue, setNewMemoryValue] = useState<string>('');
   const [newMemoryType, setNewMemoryType] = useState<string>('personal');
   const [memorySuccessMsg, setMemorySuccessMsg] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any | null>(null);
+  const [longTermTurns, setLongTermTurns] = useState<any[]>([]);
+  const savedTurnKeysRef = useRef<Set<string>>(new Set());
 
   // Session & Timer State
-  const [sessionID, setSessionID] = useState<string>(() => Math.random().toString(36).substring(7));
+  const [sessionID, setSessionID] = useState<string>(() => makeSessionId());
   const [timerSeconds, setTimerSeconds] = useState(0);
   const warnedAt19Ref = useRef(false);
   const warnedAt1950Ref = useRef(false);
@@ -118,6 +145,38 @@ export default function EburonApp() {
 
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
+  const saveFinalTurn = useCallback((
+    role: PersistedConversationRole,
+    rawText: string,
+    source: PersistedConversationSource = 'voice',
+    timestamp: Date = new Date(),
+    metadata: Record<string, unknown> = {}
+  ) => {
+    const content = normalizeTurnText(rawText);
+    if (!content) return;
+
+    const safeTimestamp = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+    const clientTurnId = makeStableHash(`${sessionID}:${role}:${source}:${safeTimestamp.getTime()}:${content}`);
+    const localKey = `${role}:${clientTurnId}`;
+
+    if (savedTurnKeysRef.current.has(localKey)) return;
+    savedTurnKeysRef.current.add(localKey);
+
+    api.saveConversationTurn(role, content, {
+      session_id: sessionID,
+      source,
+      client_turn_id: clientTurnId,
+      created_at: safeTimestamp.toISOString(),
+      metadata: {
+        ...metadata,
+        client_timestamp: safeTimestamp.toISOString(),
+      },
+    }).catch((err) => {
+      savedTurnKeysRef.current.delete(localKey);
+      console.error("Failed to save conversation turn:", err);
+    });
+  }, [sessionID]);
+
   useEffect(() => {
     // testConnection(); // Firestore specific, skipping for now as we use Postgres
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -132,6 +191,7 @@ export default function EburonApp() {
       if (user) {
         setIsAuthOpen(false);
         setActiveOverlay(null);
+        savedTurnKeysRef.current.clear();
 
         try {
           // Fetch Settings
@@ -142,15 +202,29 @@ export default function EburonApp() {
           setVoice(settings.voice);
           setLanguage(settings.language);
 
-          // Fetch memories
-          const memoryList = await api.fetchMemories();
-          setMemories(memoryList);
+          let context: any = null;
+          try {
+            context = await api.fetchConversationContext(200);
+            setCurrentUserProfile(context.profile || null);
+          } catch (contextError) {
+            console.error("Failed to load Supabase context, falling back to direct memory/history fetch:", contextError);
+            setCurrentUserProfile(user ? {
+              uid: user.uid,
+              email: user.email,
+              display_name: user.displayName,
+              photo_url: user.photoURL,
+            } : null);
+          }
 
-          // Fetch previous conversations
+          // Fetch memories and previous conversation turns for this Firebase UID.
+          const memoryList = context?.memories || await api.fetchMemories();
+          setMemories(memoryList);
+          const prevTurns = context?.recentTurns || await api.fetchConversations(200);
+          setLongTermTurns(prevTurns);
+
           try {
             const { turns, addTurn } = useLogStore.getState();
             if (turns.length === 0) {
-              const prevTurns = await api.fetchConversations(200);
               if (prevTurns && prevTurns.length > 0) {
                 prevTurns.forEach((t: any) => {
                   addTurn({
@@ -172,6 +246,11 @@ export default function EburonApp() {
       } else {
         setIsAuthOpen(true);
         setMemories([]);
+        setCurrentUserProfile(null);
+        setLongTermTurns([]);
+        setAllHistory(null);
+        useLogStore.getState().clearTurns();
+        savedTurnKeysRef.current.clear();
       }
     });
     return () => unsubscribe();
@@ -221,9 +300,9 @@ export default function EburonApp() {
       if (last && last.role === role && !last.isFinal) {
         updateLastTurn({ isFinal: true });
         if (role === 'user') {
-          api.saveConversationTurn('user', last.text, sessionID).catch(console.error);
+          saveFinalTurn('user', last.text, 'voice', last.timestamp);
         } else {
-          api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
+          saveFinalTurn('agent', last.text, 'voice', last.timestamp);
         }
       }
     };
@@ -258,7 +337,7 @@ export default function EburonApp() {
         const finalLast = finalTurns[finalTurns.length - 1];
         if (finalLast && finalLast.role === 'user' && !finalLast.isFinal) {
           updateLastTurn({ isFinal: true });
-          api.saveConversationTurn('user', currentUserText.current, sessionID).catch(console.error);
+          saveFinalTurn('user', currentUserText.current, 'voice', finalLast.timestamp);
         }
         currentUserText.current = "";
       }
@@ -292,7 +371,7 @@ export default function EburonApp() {
         const finalLast = finalTurns[finalTurns.length - 1];
         if (finalLast && finalLast.role === 'agent' && !finalLast.isFinal) {
           updateLastTurn({ isFinal: true });
-          api.saveConversationTurn('agent', currentAgentText.current, sessionID).catch(console.error);
+          saveFinalTurn('agent', currentAgentText.current, 'voice', finalLast.timestamp);
         }
         currentAgentText.current = "";
       }
@@ -309,11 +388,11 @@ export default function EburonApp() {
       const last = useLogStore.getState().turns.at(-1);
       if (last && last.role === 'agent' && !last.isFinal) {
         updateLastTurn({ isFinal: true });
-        api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
+        saveFinalTurn('agent', last.text, 'voice', last.timestamp, { interrupted: true });
       }
-      // Reset accumulators on interruption
       currentAgentText.current = "";
       currentUserText.current = "";
+      client.send([{ text: "SYSTEM: The Boss just interrupted you. That means they want to say something or redirect. Acknowledge it subtly in your next response — a quick 'Sorry, go ahead' or 'Mm, you go' or just pause and let them speak. Do not apologize excessively. Do not over-explain. Just yield the floor naturally like a human would." }]);
     };
 
     const handleTurnComplete = () => {
@@ -322,9 +401,9 @@ export default function EburonApp() {
         updateLastTurn({ isFinal: true });
         // Save turn to backend
         if (last.role === 'agent') {
-          api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
+          saveFinalTurn('agent', last.text, 'voice', last.timestamp);
         } else if (last.role === 'user') {
-          api.saveConversationTurn('user', last.text, sessionID).catch(console.error);
+          saveFinalTurn('user', last.text, 'voice', last.timestamp);
         }
       }
       // Reset accumulators for the next exchange
@@ -346,12 +425,15 @@ export default function EburonApp() {
       const responses = await Promise.all(
         functionCalls.map(async (fc: any) => {
           // Log the function call in the UI as a system turn
+          const toolTimestamp = new Date();
           useLogStore.getState().addTurn({
             role: 'system',
             text: `Executed ${fc.name}`,
             toolName: fc.name,
-            isFinal: true
+            isFinal: true,
+            timestamp: toolTimestamp,
           });
+          saveFinalTurn('system', `Executed ${fc.name}`, 'tool', toolTimestamp, { toolName: fc.name });
 
           if (fc.name === 'save_memory') {
             const content = fc.args.content || fc.args.memory;
@@ -537,7 +619,7 @@ export default function EburonApp() {
       client.off('interrupted', handleInterrupted);
       client.off('turncomplete', handleTurnComplete);
     };
-  }, [client]);
+  }, [client, saveFinalTurn]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -600,7 +682,12 @@ export default function EburonApp() {
       lastUserSpeechTime.current = Date.now();
       fillerTriggeredRef.current = false;
       // AI starts the conversation on connection
-      const pastConversations = turns.filter((t: any) => t.isFinal && t.text && t.role !== 'system').slice(-15).map((t: any) => `${t.role}: ${t.text}`).join('\n');
+      const contextTurns = longTermTurns.length > 0 ? longTermTurns : turns;
+      const pastConversations = contextTurns
+        .filter((t: any) => (t.isFinal ?? true) && (t.text || t.content) && t.role !== 'system')
+        .slice(-15)
+        .map((t: any) => `${t.role}: ${t.text || t.content}`)
+        .join('\n');
       const historyContext = pastConversations ? `\n\nFor context, here is the recent history from our last interaction:\n${pastConversations}` : '';
 
       setTimeout(() => {
@@ -614,7 +701,7 @@ export default function EburonApp() {
       hasStartedRef.current = false;
       fillerTriggeredRef.current = false;
     }
-  }, [connected, client /* turns intentionally omitted */]);
+  }, [connected, client, longTermTurns /* turns intentionally omitted */]);
 
   useEffect(() => {
     const enabledTools = tools
@@ -628,14 +715,22 @@ export default function EburonApp() {
       ? memories.map((m: any) => `- ${m.content} (${m.type})`).join('\n')
       : "";
 
+    const profileContext = currentUserProfile
+      ? [
+        currentUserProfile.display_name ? `Display name: ${currentUserProfile.display_name}` : '',
+        currentUserProfile.email ? `Email: ${currentUserProfile.email}` : '',
+        currentUserProfile.uid ? `Firebase UID: ${currentUserProfile.uid}` : '',
+      ].filter(Boolean).join('\n')
+      : "";
 
     // Build conversation history context from previous sessions (read from store to avoid dep loop)
     const storeTurns = useLogStore.getState().turns;
-    const historyTurns = storeTurns
-      .filter((t: any) => t.isFinal && t.text && t.role !== 'system')
+    const historySourceTurns = longTermTurns.length > 0 ? longTermTurns : storeTurns;
+    const historyTurns = historySourceTurns
+      .filter((t: any) => (t.isFinal ?? true) && (t.text || t.content) && t.role !== 'system')
       .slice(-30);
     const historyStr = historyTurns.length > 0
-      ? historyTurns.map((t: any) => `${t.role === 'user' ? userCallName : personaName}: ${t.text}`).join('\n')
+      ? historyTurns.map((t: any) => `${t.role === 'user' ? userCallName : personaName}: ${t.text || t.content}`).join('\n')
       : "";
     setConfig({
       responseModalities: [Modality.AUDIO],
@@ -655,6 +750,9 @@ IMPORTANT: You MUST speak entirely in ${language}. Do not stray from ${language}
 
 YOUR PERSONALIZED USER MEMORY:
 ${memoryStr || `No previous history yet. This is your first time meeting ${userCallName}.`}
+
+CURRENT SIGNED-IN USER PROFILE:
+${profileContext || `Only the current Firebase-authenticated user is active.`}
 
 RECENT CONVERSATION HISTORY (Last Session):
 ${historyStr || `No previous conversation history.`}
@@ -729,7 +827,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         { googleSearch: {} }
       ]
     } as any);
-  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories]);
+  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile]);
 
   useEffect(() => {
     let interval: any;
@@ -836,6 +934,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/youtube');
     provider.addScope('https://www.googleapis.com/auth/youtube.upload');
     provider.addScope('https://www.googleapis.com/auth/youtubepartner');
+    provider.addScope('https://www.googleapis.com/auth/photoslibrary');
     // Firebase & GCP Backend
     provider.addScope('https://www.googleapis.com/auth/firebase');
     provider.addScope('https://www.googleapis.com/auth/firebase.messaging');
@@ -847,6 +946,14 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/monitoring');
     provider.addScope('https://www.googleapis.com/auth/cloud-platform');
     // Chat
+    // Google Maps & Geo
+    provider.addScope('https://www.googleapis.com/auth/cloud-translation');
+    provider.addScope('https://www.googleapis.com/auth/cloud-vision');
+    // Analytics & BigQuery
+    provider.addScope('https://www.googleapis.com/auth/analytics');
+    provider.addScope('https://www.googleapis.com/auth/analytics.readonly');
+    provider.addScope('https://www.googleapis.com/auth/bigquery');
+
     provider.addScope('https://www.googleapis.com/auth/chat');
     provider.addScope('https://www.googleapis.com/auth/chat.messages');
 
@@ -855,6 +962,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         useAuth.getState().setGoogleAccessToken(credential.accessToken);
+        api.saveGoogleToken(credential.accessToken).catch(() => { });
       }
     } catch (err: any) {
       setAuthError(err.message);
@@ -862,15 +970,17 @@ Output only natural spoken text. No stage directions, no brackets, no role label
   };
 
   const handleSend = () => {
-    if (!message.trim()) return;
-    client.send({ text: message });
-    useLogStore.getState().addTurn({ role: 'user', text: message, isFinal: true });
-    api.saveConversationTurn('user', message, sessionID).catch(console.error);
+    const content = message.trim();
+    if (!content) return;
+    const timestamp = new Date();
+    client.send({ text: content });
+    useLogStore.getState().addTurn({ role: 'user', text: content, isFinal: true, timestamp });
+    saveFinalTurn('user', content, 'text', timestamp);
     setMessage('');
   };
 
   const handleToolAction = (toolId: string) => {
-    if (['history', 'tools', 'profile', 'settings', 'automation'].includes(toolId)) {
+    if (['history', 'tools', 'profile', 'settings', 'automation', 'whatsapp'].includes(toolId)) {
       setActiveOverlay(toolId);
     } else {
       const prompts: Record<string, string> = {
@@ -888,11 +998,14 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       const prompt = prompts[toolId] || `Execute action: ${toolId}`;
       if (connected) {
         client.send({ text: prompt });
-        useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true });
-        api.saveConversationTurn('user', prompt, sessionID).catch(console.error);
+        const timestamp = new Date();
+        useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true, timestamp });
+        saveFinalTurn('user', prompt, 'text', timestamp, { action: toolId });
       }
       else {
-        useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true });
+        const timestamp = new Date();
+        useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true, timestamp });
+        saveFinalTurn('user', prompt, 'text', timestamp, { action: toolId, disconnected: true });
         setTimeout(() => useLogStore.getState().addTurn({ role: 'agent', text: "I'm disconnected.", isFinal: true }), 800);
       }
     }
@@ -1034,8 +1147,9 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         <div className="skills-row" data-row="2">
           <div className="skills-track">
             <div className="skill-chip" onClick={() => handleToolAction('settings')}><div className="skill-glyph bg-settings"><i className="ph-duotone ph-gear"></i></div><span className="skill-label">Settings</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('whatsapp')}><div className="skill-glyph bg-whatsapp"><i className="ph-duotone ph-whatsapp-logo"></i></div><span className="skill-label">WhatsApp</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('tools')}><div className="skill-glyph bg-tools"><i className="ph-duotone ph-wrench"></i></div><span className="skill-label">Tools</span></div>
-            <div className="skill-chip" onClick={() => handleToolAction('automation')}><div className="skill-glyph" style={{background: 'rgba(203,251,69,0.12)'}}><i className="ph-duotone ph-robot" style={{color: 'var(--accent-active)'}}></i></div><span className="skill-label">Automation</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('automation')}><div className="skill-glyph" style={{ background: 'rgba(203,251,69,0.12)' }}><i className="ph-duotone ph-robot" style={{ color: 'var(--accent-active)' }}></i></div><span className="skill-label">Automation</span></div>
 
             <div className="skill-chip" onClick={() => handleToolAction('history')}><div className="skill-glyph bg-history"><i className="ph-duotone ph-clock-counter-clockwise"></i></div><span className="skill-label">History</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('proposal')}><div className="skill-glyph bg-proposal"><i className="ph-duotone ph-presentation-chart"></i></div><span className="skill-label">Proposal</span></div>
@@ -1458,6 +1572,17 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         </div>
       </div>
 
+      {/* WhatsApp Settings */}
+      <div id="overlay-whatsapp" className={`full-page-overlay ${activeOverlay === 'whatsapp' ? 'active' : ''}`}>
+        <div className="overlay-header">
+          <div className="overlay-title">WhatsApp</div>
+          <button className="close-overlay-btn" title="Close WhatsApp" onClick={() => setActiveOverlay(null)}><i className="ph-bold ph-x"></i></button>
+        </div>
+        <div className="overlay-content">
+          <WhatsAppConnectPanel />
+        </div>
+      </div>
+
       {/* History Overlay */}
       <div id="overlay-history" className={`full-page-overlay ${activeOverlay === 'history' ? 'active' : ''}`}>
         <div className="overlay-header">
@@ -1531,7 +1656,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               if (historyRoleFilter === 'system' && historyToolFilter !== 'all') matchesTool = t.toolName?.includes(historyToolFilter) || false;
               let matchesDate = true;
               if (historyDateRange !== 'all') {
-                const date = t.message_timestamp ? new Date(t.message_timestamp) : new Date();
+                const date = t.message_timestamp ? new Date(t.message_timestamp) : (t.created_at ? new Date(t.created_at) : new Date());
                 const now = new Date();
                 if (historyDateRange === 'today') matchesDate = date.toDateString() === now.toDateString();
                 else if (historyDateRange === 'week') {
@@ -1579,7 +1704,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                           <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: turn.role === 'user' ? 'var(--accent-active)' : 'var(--text-muted)' }}>
                             {turn.role === 'user' ? userCallName : turn.role === 'system' ? 'System' : personaName}
                           </span>
-                          {turn.message_timestamp && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(turn.message_timestamp).toLocaleTimeString()}</span>}
+                          {(turn.message_timestamp || turn.created_at) && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(turn.message_timestamp || turn.created_at).toLocaleTimeString()}</span>}
                         </div>
                         <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-main)' }}>
                           <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
@@ -1597,7 +1722,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       {/* Automation Overlay */}
       <div id="overlay-automation" className={`full-page-overlay ${activeOverlay === 'automation' ? 'active' : ''}`}>
         <div className="overlay-header">
-          <div className="overlay-title"><i className="ph-fill ph-robot" style={{color:'var(--accent-active)', marginRight:'8px'}}></i>Automations</div>
+          <div className="overlay-title"><i className="ph-fill ph-robot" style={{ color: 'var(--accent-active)', marginRight: '8px' }}></i>Automations</div>
           <button className="close-overlay-btn" title="Close automations" onClick={() => setActiveOverlay(null)}><i className="ph-bold ph-x"></i></button>
         </div>
         <div className="overlay-content" style={{ overflowY: 'auto' }}>
@@ -1613,6 +1738,31 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         </div>
         <div className="overlay-content"><p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>All tools active.</p></div>
       </div>
+      {showResultPage && (
+        <div className="result-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)',
+          zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-main)', fontFamily: 'Inter, system-ui, sans-serif'
+        }}>
+          <div className="result-content" style={{
+            width: '90%', maxWidth: '800px', maxHeight: '80vh',
+            backgroundColor: 'var(--bg-card)', borderRadius: '24px',
+            padding: '40px', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            border: '1px solid var(--border-color)', position: 'relative'
+          }}>
+            <button onClick={() => setShowResultPage(false)} style={{
+              position: 'absolute', top: '20px', right: '20px',
+              background: 'none', border: 'none', color: 'var(--text-muted)',
+              cursor: 'pointer', fontSize: '24px', padding: '0'
+            }}>×</button>
+            <h2 style={{ fontSize: '28px', marginBottom: '24px', fontWeight: 800, color: 'var(--accent-primary)' }}>Task Result</h2>
+            <div className="result-body" style={{ lineHeight: '1.6', fontSize: '16px', whiteSpace: 'pre-wrap' }}>
+              {resultData || 'No data available.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auth Screen */}
       <div id="auth-screen" className={`full-page-overlay ${isAuthOpen ? 'active' : ''}`}>

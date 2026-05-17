@@ -879,11 +879,23 @@ export const useUI = create<{
   toggleSidebar: () => void;
   activeWorkspaceResult: any;
   setActiveWorkspaceResult: (result: any) => void;
+  showResultPage: boolean;
+  setShowResultPage: (show: boolean) => void;
+  resultData: any;
+  setResultData: (data: any) => void;
+  isToolRunning: boolean;
+  setIsToolRunning: (v: boolean) => void;
 }>(set => ({
   isSidebarOpen: true,
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
   activeWorkspaceResult: null,
-  setActiveWorkspaceResult: (result) => set({ activeWorkspaceResult: result })
+  setActiveWorkspaceResult: (result) => set({ activeWorkspaceResult: result }),
+  showResultPage: false,
+  setShowResultPage: (show) => set({ showResultPage: show }),
+  resultData: null,
+  setResultData: (data) => set({ resultData: data }),
+  isToolRunning: false,
+  setIsToolRunning: (v) => set({ isToolRunning: v }),
 }));
 
 /**

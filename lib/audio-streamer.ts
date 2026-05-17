@@ -32,12 +32,15 @@ export class AudioStreamer {
   // Indicates if the stream has finished playing, e.g., interrupted.
   private isStreamComplete: boolean = false;
   private checkInterval: number | null = null;
+  private scheduleTimeout: number | null = null;
   private scheduledTime: number = 0;
+  private streamVersion: number = 0;
   private initialBufferTime: number = 0.1; //0.1 // 100ms initial buffer
   // Web Audio API nodes. source => gain => destination
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
+  private activeSources = new Set<AudioBufferSourceNode>();
 
   public onComplete = () => {};
 
@@ -138,7 +141,43 @@ export class AudioStreamer {
     return audioBuffer;
   }
 
-  private scheduleNextBuffer() {
+  private clearTimers() {
+    if (this.checkInterval) {
+      window.clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+
+    if (this.scheduleTimeout) {
+      window.clearTimeout(this.scheduleTimeout);
+      this.scheduleTimeout = null;
+    }
+  }
+
+  private stopSource(source: AudioBufferSourceNode) {
+    source.onended = null;
+    try {
+      source.stop(0);
+    } catch {
+      // The source may have already ended or not yet started.
+    }
+    try {
+      source.disconnect();
+    } catch {
+      // Ignore nodes that were already disconnected.
+    }
+  }
+
+  private stopActiveSources() {
+    this.activeSources.forEach(source => this.stopSource(source));
+    this.activeSources.clear();
+    this.endOfQueueAudioSource = null;
+  }
+
+  private scheduleNextBuffer(version = this.streamVersion) {
+    if (version !== this.streamVersion) {
+      return;
+    }
+
     const SCHEDULE_AHEAD_TIME = 0.2;
 
     while (
@@ -154,16 +193,18 @@ export class AudioStreamer {
           this.endOfQueueAudioSource.onended = null;
         }
         this.endOfQueueAudioSource = source;
-        source.onended = () => {
-          if (
-            !this.audioQueue.length &&
-            this.endOfQueueAudioSource === source
-          ) {
-            this.endOfQueueAudioSource = null;
-            this.onComplete();
-          }
-        };
       }
+
+      source.onended = () => {
+        this.activeSources.delete(source);
+        if (
+          !this.audioQueue.length &&
+          this.endOfQueueAudioSource === source
+        ) {
+          this.endOfQueueAudioSource = null;
+          this.onComplete();
+        }
+      };
 
       source.buffer = audioBuffer;
       source.connect(this.gainNode);
@@ -185,6 +226,7 @@ export class AudioStreamer {
       }
       // Ensure we never schedule in the past
       const startTime = Math.max(this.scheduledTime, this.context.currentTime);
+      this.activeSources.add(source);
       source.start(startTime);
       this.scheduledTime = startTime + audioBuffer.duration;
     }
@@ -192,15 +234,16 @@ export class AudioStreamer {
     if (this.audioQueue.length === 0) {
       if (this.isStreamComplete) {
         this.isPlaying = false;
-        if (this.checkInterval) {
-          clearInterval(this.checkInterval);
-          this.checkInterval = null;
-        }
+        this.clearTimers();
       } else {
         if (!this.checkInterval) {
           this.checkInterval = window.setInterval(() => {
+            if (version !== this.streamVersion) {
+              this.clearTimers();
+              return;
+            }
             if (this.audioQueue.length > 0) {
-              this.scheduleNextBuffer();
+              this.scheduleNextBuffer(version);
             }
           }, 100) as unknown as number;
         }
@@ -208,32 +251,32 @@ export class AudioStreamer {
     } else {
       const nextCheckTime =
         (this.scheduledTime - this.context.currentTime) * 1000;
-      setTimeout(
-        () => this.scheduleNextBuffer(),
-        Math.max(0, nextCheckTime - 50)
-      );
+      if (this.scheduleTimeout) {
+        window.clearTimeout(this.scheduleTimeout);
+      }
+      this.scheduleTimeout = window.setTimeout(() => {
+        this.scheduleTimeout = null;
+        this.scheduleNextBuffer(version);
+      }, Math.max(0, nextCheckTime - 50)) as unknown as number;
     }
   }
 
-  stop() {
+  clear() {
+    this.streamVersion += 1;
     this.isPlaying = false;
     this.isStreamComplete = true;
     this.audioQueue = [];
     this.scheduledTime = this.context.currentTime;
+    this.clearTimers();
+    this.stopActiveSources();
 
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-    }
+    const now = this.context.currentTime;
+    this.gainNode.gain.cancelScheduledValues(now);
+    this.gainNode.gain.setValueAtTime(1, now);
+  }
 
-
-    setTimeout(() => {
-      this.gainNode.gain.setValueAtTime(0, this.context.currentTime);
-    this.gainNode.gain.setValueAtTime(0, this.context.currentTime);
-    this.gainNode.disconnect();
-      this.gainNode = this.context.createGain();
-      this.gainNode.connect(this.context.destination);
-    }, 200);
+  stop() {
+    this.clear();
   }
 
   async resume() {
@@ -247,7 +290,11 @@ export class AudioStreamer {
 
   complete() {
     this.isStreamComplete = true;
-    this.onComplete();
+    if (!this.audioQueue.length && !this.activeSources.size) {
+      this.isPlaying = false;
+      this.clearTimers();
+      this.onComplete();
+    }
   }
 }
 

@@ -31,9 +31,21 @@ import {
   getAutomationRuns,
   loadAndScheduleAll,
 } from "./lib/server/automation-engine";
+import {
+  createInstance,
+  fetchQRCode,
+  fetchConnectionState,
+  sendMessage,
+  logoutInstance,
+  deleteInstance,
+  normalizeEvolutionState,
+  verifyWebhookSecret,
+} from "./lib/server/evolution-client";
 
 dotenv.config();
 dotenv.config({ path: '.env.local' });
+
+const BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "http://localhost:3000";
 
 // Initialize Firebase Admin for Authentication
 if (!admin.apps.length) {
@@ -50,8 +62,71 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn("WARNING: Supabase credentials missing. Settings and memories will likely fail.");
 }
 
-// Only create client if URL is present to avoid crashing on start
-const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey) : null;
+// Only create client if URL is present to avoid crashing on start.
+const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+}) : null;
+
+type AuthenticatedRequest = express.Request & {
+  user?: admin.auth.DecodedIdToken;
+};
+
+const jsonError = (
+  res: express.Response,
+  status: number,
+  code: string,
+  message: string,
+  details?: unknown,
+) => {
+  return res.status(status).json({
+    error: {
+      code,
+      message,
+      ...(details === undefined ? {} : { details }),
+    },
+  });
+};
+
+const isMissingSupabaseColumn = (error: any) => {
+  const message = String(error?.message || "");
+  return message.includes("column") && message.includes("does not exist");
+};
+
+const normalizeRole = (role: string) => role === "assistant" ? "agent" : role;
+
+async function syncFirebaseUserToSupabase(user: admin.auth.DecodedIdToken) {
+  if (!supabase) return;
+
+  const now = new Date().toISOString();
+  const identities = user.firebase?.identities || {};
+  const providerIds = Object.keys(identities);
+
+  const { error } = await supabase
+    .from("user_profiles")
+    .upsert({
+      uid: user.uid,
+      email: user.email || null,
+      display_name: user.name || null,
+      photo_url: user.picture || null,
+      phone_number: user.phone_number || null,
+      email_verified: Boolean(user.email_verified),
+      sign_in_provider: user.firebase?.sign_in_provider || null,
+      provider_ids: providerIds,
+      raw_claims: {
+        auth_time: user.auth_time || null,
+        issuer: user.iss || null,
+      },
+      last_seen_at: now,
+      updated_at: now,
+    }, { onConflict: "uid" });
+
+  if (error) {
+    console.warn("Supabase user profile sync skipped:", error.message);
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -71,26 +146,31 @@ async function startServer() {
     res.json({ status: "ok", message: "Server is running", supabaseConnected: !!supabase });
   });
 
+  app.get("/api/test-whatsapp", (req, res) => {
+    res.json({ route: "whatsapp-test", found: true });
+  });
+
   // Middleware to verify Firebase Auth Token
-  const authenticateToken = async (req: any, res: any, next: any) => {
+  const authenticateToken = async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       console.log("No token provided in request");
-      return res.status(401).json({ error: "Unauthorized: No token provided" });
+      return jsonError(res, 401, "AUTH_TOKEN_MISSING", "Unauthorized: no Firebase ID token provided.");
     }
 
     try {
       if (!admin.apps.length) {
-         return res.status(500).json({ error: "Firebase Admin not initialized" });
+         return jsonError(res, 500, "FIREBASE_ADMIN_MISSING", "Firebase Admin is not initialized.");
       }
       const decodedToken = await admin.auth().verifyIdToken(token);
       req.user = decodedToken;
+      await syncFirebaseUserToSupabase(decodedToken);
       next();
     } catch (err: any) {
       console.error("Token verification error:", err.message);
-      return res.status(403).json({ error: "Forbidden: Invalid token", details: err.message });
+      return jsonError(res, 403, "AUTH_TOKEN_INVALID", "Forbidden: invalid Firebase ID token.", err.message);
     }
   };
 
@@ -128,7 +208,41 @@ async function startServer() {
     });
   };
 
+  const requireSupabase = (res: express.Response) => {
+    if (!supabase) {
+      jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Database not connected. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+      return null;
+    }
+    return supabase;
+  };
+
   const ollamaTargetSchema = z.enum(["self", "cloud"]).default("self");
+  const conversationRoleSchema = z.enum(["user", "agent", "assistant", "system"]);
+  const conversationSourceSchema = z.enum(["voice", "text", "tool", "system", "import"]).default("text");
+  const conversationTurnSchema = z.object({
+    role: conversationRoleSchema,
+    content: z.string().trim().min(1).max(50000),
+    session_id: z.string().trim().min(1).max(160).optional().nullable(),
+    client_turn_id: z.string().trim().min(1).max(180).optional().nullable(),
+    source: conversationSourceSchema.optional(),
+    metadata: z.record(z.any()).optional(),
+    created_at: z.string().datetime().optional(),
+  });
+  const conversationQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(1000).default(100),
+    session_id: z.string().trim().min(1).max(160).optional(),
+    q: z.string().trim().min(1).max(200).optional(),
+  });
+  const contextQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(60),
+  });
+  const memoryTypeSchema = z.enum(["personal", "work", "project", "conversation", "preference"]).default("personal");
+  const memoryCreateSchema = z.object({
+    content: z.string().trim().min(1).max(20000),
+    type: memoryTypeSchema.optional(),
+    source: z.string().trim().max(80).optional(),
+    metadata: z.record(z.any()).optional(),
+  });
   const vpsCommandSchema = z.object({
     command: z.string().trim().min(1).max(4000),
     cwd: z.string().trim().max(200).optional(),
@@ -172,6 +286,63 @@ async function startServer() {
     }
   });
   
+  // Google Token Persistence (Supabase)
+  app.post("/api/google-token", authenticateToken, async (req: any, res) => {
+    try {
+      const { access_token, expires_at } = req.body || {};
+      if (!access_token) return jsonError(res, 400, "MISSING_TOKEN", "access_token is required.");
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      // Try to create table if it doesn't exist
+      try {
+        await db.from("google_tokens").select("uid").limit(1);
+      } catch {
+        console.warn("google_tokens table not found — run GOOGLE_TOKENS_SCHEMA.sql in Supabase");
+        return jsonError(res, 500, "TABLE_MISSING", "google_tokens table not found. Run GOOGLE_TOKENS_SCHEMA.sql in your Supabase SQL editor.");
+      }
+
+      const { error } = await db
+        .from("google_tokens")
+        .upsert({
+          uid,
+          access_token,
+          expires_at: expires_at || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "uid" });
+      if (error) {
+        console.error("Supabase google_tokens upsert failed:", error.message);
+        return jsonError(res, 500, "DB_ERROR", error.message);
+      }
+      res.json({ status: "ok" });
+    } catch (err: any) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  app.get("/api/google-token", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+      const { data, error } = await db
+        .from("google_tokens")
+        .select("access_token, expires_at")
+        .eq("uid", uid)
+        .maybeSingle();
+      if (error) return jsonError(res, 500, "DB_ERROR", error.message);
+      if (!data) return jsonError(res, 404, "NOT_FOUND", "No Google token stored for this user.");
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // Settings
+
   // Settings
   app.get("/api/settings", authenticateToken, async (req: any, res) => {
     try {
@@ -304,169 +475,288 @@ async function startServer() {
     }
   });
 
-  // Conversations (user_conversations schema)
-  app.get("/api/conversations", authenticateToken, async (req: any, res) => {
-    try {
-      if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
-      const { uid } = req.user;
-      const { limit = 100 } = req.query;
+  const touchConversationSession = async (uid: string, sessionId: string, title?: string | null) => {
+    if (!supabase || !sessionId) return;
 
-      const { data, error } = await supabase
-        .from("user_conversations")
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("conversation_sessions")
+      .upsert({
+        uid,
+        session_id: sessionId,
+        title: title || null,
+        last_message_at: now,
+        updated_at: now,
+      }, { onConflict: "uid,session_id" });
+
+    if (error) {
+      console.warn("Conversation session sync skipped:", error.message);
+    }
+  };
+
+  // Current authenticated Firebase user mirrored into Supabase.
+  app.get("/api/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const db = requireSupabase(res);
+      if (!db || !req.user) return;
+      const { uid } = req.user;
+
+      const { data, error } = await db
+        .from("user_profiles")
         .select("*")
         .eq("uid", uid)
-        .order("created_at", { ascending: true })
-        .limit(Number(limit));
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          return res.status(503).json({
-            error: "user_conversations table is missing. Please run the SQL in SCHEMA.sql in your Supabase SQL Editor.",
-            setupRequired: true
-          });
-        }
-        throw error;
+        return jsonError(res, 503, "USER_PROFILE_TABLE_MISSING", "Run SCHEMA.sql so Firebase users can be mirrored into Supabase.", error.message);
       }
-      res.json(data || []);
+
+      res.json({
+        profile: data || {
+          uid,
+          email: req.user.email || null,
+          display_name: req.user.name || null,
+          photo_url: req.user.picture || null,
+        },
+      });
     } catch (err: any) {
-      console.error("Fetch conversations error:", err.message);
-      res.status(500).json({ error: err.message });
+      console.error("Fetch current user error:", err);
+      jsonError(res, 500, "CURRENT_USER_FETCH_FAILED", err.message || String(err));
     }
   });
 
-  app.post("/api/conversations", authenticateToken, async (req: any, res) => {
+  // Long-term context assembled from the current Firebase user's Supabase rows.
+  app.get("/api/conversations/context", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
-      const { uid } = req.user;
-      const { role, content, session_id } = req.body;
-
-      if (!role || !content) {
-        return res.status(400).json({ error: "Missing role or content" });
+      const db = requireSupabase(res);
+      if (!db || !req.user) return;
+      const query = contextQuerySchema.safeParse(req.query);
+      if (!query.success) {
+        return jsonError(res, 400, "VALIDATION_ERROR", "Invalid context query.", query.error.flatten());
       }
 
-      const { data, error } = await supabase
-        .from("user_conversations")
-        .insert({
+      const { uid } = req.user;
+      const limit = query.data.limit;
+
+      const [profileResult, settingsResult, memoriesResult, turnsResult] = await Promise.all([
+        db.from("user_profiles").select("*").eq("uid", uid).maybeSingle(),
+        db.from("user_settings").select("*").eq("uid", uid).maybeSingle(),
+        db.from("user_memories").select("*").eq("uid", uid).order("created_at", { ascending: false }).limit(80),
+        db.from("user_conversations").select("*").eq("uid", uid).order("created_at", { ascending: false }).limit(limit),
+      ]);
+
+      const hardError = turnsResult.error || memoriesResult.error;
+      if (hardError) {
+        return jsonError(res, 503, "CONTEXT_TABLES_MISSING", "Run SCHEMA.sql so Supabase can store conversations and memories per Firebase UID.", hardError.message);
+      }
+
+      if (profileResult.error) console.warn("Context profile lookup skipped:", profileResult.error.message);
+      if (settingsResult.error) console.warn("Context settings lookup skipped:", settingsResult.error.message);
+
+      res.json({
+        profile: profileResult.data || {
           uid,
-          role,
-          content,
-          session_id: session_id || null,
-          created_at: new Date().toISOString(),
-        })
+          email: req.user.email || null,
+          display_name: req.user.name || null,
+          photo_url: req.user.picture || null,
+        },
+        settings: settingsResult.data || null,
+        memories: memoriesResult.data || [],
+        recentTurns: (turnsResult.data || []).reverse(),
+        fetchedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("Fetch conversation context error:", err);
+      jsonError(res, 500, "CONTEXT_FETCH_FAILED", err.message || String(err));
+    }
+  });
+
+  // Conversations (all user + AI turns, partitioned by Firebase UID)
+  app.get("/api/conversations", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const db = requireSupabase(res);
+      if (!db || !req.user) return;
+      const parsed = conversationQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return jsonError(res, 400, "VALIDATION_ERROR", "Invalid conversation query.", parsed.error.flatten());
+      }
+
+      const { uid } = req.user;
+      const { limit, session_id, q } = parsed.data;
+
+      let query = db
+        .from("user_conversations")
+        .select("*")
+        .eq("uid", uid)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (session_id) query = query.eq("session_id", session_id);
+      if (q) query = query.ilike("content", `%${q}%`);
+
+      const { data, error } = await query;
+
+      if (error) {
+        return jsonError(res, 503, "CONVERSATIONS_TABLE_MISSING", "user_conversations is unavailable. Run SCHEMA.sql in Supabase.", error.message);
+      }
+
+      res.json((data || []).reverse());
+    } catch (err: any) {
+      console.error("Fetch conversations error:", err);
+      jsonError(res, 500, "CONVERSATIONS_FETCH_FAILED", err.message || String(err));
+    }
+  });
+
+  app.post("/api/conversations", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    const body = parseRequest(conversationTurnSchema, req.body, res);
+    if (!body || !req.user) return;
+
+    try {
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const uid = req.user.uid;
+      const sessionId = body.session_id || `default-${uid}`;
+      const createdAt = body.created_at || new Date().toISOString();
+      const content = body.content.trim();
+      const title = content.length > 90 ? `${content.slice(0, 90)}...` : content;
+
+      await touchConversationSession(uid, sessionId, title);
+
+      const fullPayload: Record<string, unknown> = {
+        uid,
+        session_id: sessionId,
+        role: normalizeRole(body.role),
+        content,
+        client_turn_id: body.client_turn_id || null,
+        source: body.source || "text",
+        metadata: body.metadata || {},
+        created_at: createdAt,
+      };
+
+      let result = await db
+        .from("user_conversations")
+        .insert(fullPayload)
         .select()
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          console.warn("Skipping conversation sync: user_conversations table missing.");
-          return res.status(204).send();
-        }
-        throw error;
+      if (result.error?.code === "23505" && body.client_turn_id) {
+        result = await db
+          .from("user_conversations")
+          .select("*")
+          .eq("uid", uid)
+          .eq("client_turn_id", body.client_turn_id)
+          .maybeSingle();
       }
-      res.json(data);
+
+      if (result.error && isMissingSupabaseColumn(result.error)) {
+        const fallbackPayload = {
+          uid,
+          session_id: sessionId,
+          role: normalizeRole(body.role),
+          content,
+          created_at: createdAt,
+        };
+        result = await db
+          .from("user_conversations")
+          .insert(fallbackPayload)
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        return jsonError(res, 500, "CONVERSATION_SAVE_FAILED", result.error.message, result.error);
+      }
+
+      res.json(result.data);
     } catch (err: any) {
-      console.error("Save conversation turn error:", err.message);
-      res.status(500).json({ error: err.message });
+      console.error("Save conversation turn error:", err);
+      jsonError(res, 500, "CONVERSATION_SAVE_FAILED", err.message || String(err));
     }
   });
 
   // Memories
-  app.get("/api/memories", authenticateToken, async (req: any, res) => {
+  app.get("/api/memories", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
+      const db = requireSupabase(res);
+      if (!db || !req.user) return;
       const { uid } = req.user;
-      let { data, error } = await supabase
+      const { data, error } = await db
         .from("user_memories")
         .select("*")
         .eq("uid", uid)
         .order("created_at", { ascending: false });
 
-      // Fallback if 'uid' column missing
-      if (error && error.message.includes('column user_memories.uid does not exist')) {
-        console.warn("Fallback: 'uid' column missing in user_memories. Cannot safely fallback to 'id' (BIGINT/UUID).");
-      }
-
       if (error) {
-          if (error.message.includes('invalid input syntax for type uuid')) {
-              throw new Error(`Type mismatch in user_memories: Firebase UID cannot be used with a UUID column.`);
-          }
-          throw error;
+        return jsonError(res, 503, "MEMORIES_TABLE_MISSING", "user_memories is unavailable. Run SCHEMA.sql in Supabase.", error.message);
       }
-      res.json(data);
+      res.json(data || []);
     } catch (err: any) {
       console.error("Memories GET error:", err);
-      const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      res.status(500).json({ error: "Internal server error: " + errorMessage });
+      jsonError(res, 500, "MEMORIES_FETCH_FAILED", err.message || String(err));
     }
   });
 
-  app.post("/api/memories", authenticateToken, async (req: any, res) => {
+  app.post("/api/memories", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    const body = parseRequest(memoryCreateSchema, req.body, res);
+    if (!body || !req.user) return;
+
     try {
-      if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
+      const db = requireSupabase(res);
+      if (!db) return;
       const { uid } = req.user;
-      const { content, type = 'personal' } = req.body;
 
-      if (!content) {
-        return res.status(400).json({ error: "Missing 'content' in request body" });
-      }
-      
-      console.log(`Saving memory for ${uid}:`, { content, type });
-
-      let result = await supabase
+      let result = await db
         .from("user_memories")
-        .insert([{ uid, content, type }])
+        .insert([{
+          uid,
+          content: body.content.trim(),
+          type: body.type || "personal",
+          source: body.source || "manual",
+          metadata: body.metadata || {},
+        }])
         .select()
         .single();
 
-      // Fallback if 'uid' column missing
-      if (result.error && result.error.message.includes('column user_memories.uid does not exist')) {
-         console.error("Critical: user_memories table is missing 'uid' column. Please run SCHEMA.sql.");
-         return res.status(500).json({ error: "Database schema mismatch: missing 'uid' column in user_memories table." });
+      if (result.error && isMissingSupabaseColumn(result.error)) {
+        result = await db
+          .from("user_memories")
+          .insert([{ uid, content: body.content.trim(), type: body.type || "personal" }])
+          .select()
+          .single();
       }
 
       if (result.error) {
-          console.error("Memories POST Supabase error:", result.error);
-          if (result.error.message.includes('invalid input syntax for type uuid')) {
-              return res.status(400).json({ error: `Type mismatch in user_memories: Cannot insert into a UUID column with Firebase UID TEXT. Please run SCHEMA.sql.` });
-          }
-          return res.status(500).json({ error: result.error.message });
+        return jsonError(res, 500, "MEMORY_SAVE_FAILED", result.error.message, result.error);
       }
+
       res.json(result.data);
     } catch (err: any) {
-      console.error("Memories POST catch error:", err);
-      const errorMessage = err?.message || String(err);
-      res.status(500).json({ error: "Internal server error: " + errorMessage });
+      console.error("Memories POST error:", err);
+      jsonError(res, 500, "MEMORY_SAVE_FAILED", err.message || String(err));
     }
   });
 
-  app.delete("/api/memories/:id", authenticateToken, async (req: any, res) => {
+  app.delete("/api/memories/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
+      const db = requireSupabase(res);
+      if (!db || !req.user) return;
       const { uid } = req.user;
       const { id } = req.params;
-      
-      let { error } = await supabase
+
+      const { error } = await db
         .from("user_memories")
         .delete()
-        .eq("id", id) // 'id' here is the memory's BIGINT id
+        .eq("id", id)
         .eq("uid", uid);
 
-      // Fallback if 'uid' column missing
-      if (error && error.message.includes('column user_memories.uid does not exist')) {
-         // Note: in many tables, if they don't have 'uid', they might NOT have a way to filter by user
-         // unless 'id' is also the user id (but for memories it's likely a primary key).
-         // However, we'll try to find if there is another column or just report error.
-         // Actually, if uid is missing in memories, it's a structural problem.
-         // We'll try one fallback to 'userId' or just show error.
-         console.error("Critical: user_memories is missing 'uid' column.");
+      if (error) {
+        return jsonError(res, 500, "MEMORY_DELETE_FAILED", error.message, error);
       }
-
-      if (error) throw error;
       res.json({ status: "success" });
     } catch (err: any) {
       console.error("Memories DELETE error:", err);
-      const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      res.status(500).json({ error: "Internal server error: " + errorMessage });
+      jsonError(res, 500, "MEMORY_DELETE_FAILED", err.message || String(err));
     }
   });
 
@@ -671,6 +961,295 @@ async function startServer() {
     }
   });
 
+  // ── WhatsApp Integration Routes ──
+
+  app.post("/api/whatsapp/connect", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const instanceName = `beatrice_user_${uid}`;
+      const webhookUrl = `${BACKEND_URL}/webhooks/evolution`;
+
+      // Check existing connection
+      const { data: existing } = await db
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (existing?.status === "connected") {
+        return res.json({
+          status: "connected",
+          instanceName: existing.instance_name,
+          phoneNumber: existing.phone_number,
+        });
+      }
+
+      // Create Evolution instance
+      let instanceCreated = false;
+      try {
+        await createInstance(instanceName, webhookUrl);
+        instanceCreated = true;
+      } catch (err: any) {
+        const msg = String(err.message);
+        if (msg.includes("already in use")) {
+          instanceCreated = true; // instance exists, proceed
+        } else {
+          console.error("Evolution createInstance failed:", msg);
+          return jsonError(res, 500, "EVOLUTION_ERROR", "Failed to create WhatsApp instance: " + msg);
+        }
+      }
+
+      // Small delay to let instance initialize
+      if (instanceCreated) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
+      // Fetch QR code
+      let qrBase64: string | undefined;
+      let pairingCode: string | undefined;
+      try {
+        const qr = await fetchQRCode(instanceName);
+        qrBase64 = qr.base64;
+        pairingCode = qr.pairingCode;
+      } catch (err: any) {
+        console.error("Evolution fetchQRCode failed:", err.message);
+        return jsonError(res, 500, "EVOLUTION_ERROR", "Failed to fetch WhatsApp QR: " + err.message);
+      }
+
+      if (!qrBase64) {
+        return jsonError(res, 500, "EVOLUTION_ERROR", "No QR code returned from Evolution API.");
+      }
+
+      // Upsert connection record
+      const { error: upsertErr } = await db
+        .from("whatsapp_connections")
+        .upsert({
+          user_id: uid,
+          instance_name: instanceName,
+          status: "connecting",
+          qr_base64: qrBase64,
+          pairing_code: pairingCode || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+
+      if (upsertErr) {
+        console.error("whatsapp_connections upsert:", upsertErr.message);
+        return jsonError(res, 500, "DB_ERROR", upsertErr.message);
+      }
+
+      res.json({
+        status: "connecting",
+        instanceName,
+        qrBase64: qrBase64,
+        pairingCode: pairingCode || null,
+      });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/connect:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/whatsapp/status", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return res.json({ status: "not_connected", instanceName: null });
+      }
+
+      // Check live connection state from Evolution
+      try {
+        const state = await fetchConnectionState(conn.instance_name);
+        const normalized = normalizeEvolutionState(state.instance?.state || "close");
+
+        // Update DB if status changed
+        if (normalized !== conn.status) {
+          await db.from("whatsapp_connections")
+            .update({ status: normalized, updated_at: new Date().toISOString() })
+            .eq("user_id", uid);
+        }
+
+        res.json({
+          status: normalized,
+          instanceName: conn.instance_name,
+          phoneNumber: conn.phone_number || null,
+          qrBase64: conn.qr_base64 || null,
+        });
+      } catch (err: any) {
+        // Evolution unreachable — return cached status
+        res.json({
+          status: normalized,
+          instanceName: conn.instance_name,
+          phoneNumber: conn.phone_number || null,
+          qrBase64: conn.qr_base64 || null,
+        });
+      }
+    } catch (err: any) {
+      console.error("GET /api/whatsapp/status:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/whatsapp/send", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const { number, text } = req.body || {};
+      if (!number || !text) {
+        return jsonError(res, 400, "MISSING_FIELDS", "number and text are required.");
+      }
+
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("user_id", uid)
+        .eq("status", "connected")
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const result = await sendMessage(conn.instance_name, number, text);
+      res.json({ status: "sent", result });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/send:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/whatsapp/disconnect", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return res.json({ status: "not_connected" });
+      }
+
+      // Logout + delete instance from Evolution
+      try { await logoutInstance(conn.instance_name); } catch (e) {}
+      try { await deleteInstance(conn.instance_name); } catch (e) {}
+
+      // Update DB
+      await db.from("whatsapp_connections")
+        .update({ status: "disconnected", updated_at: new Date().toISOString() })
+        .eq("user_id", uid);
+
+      res.json({ status: "disconnected" });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/disconnect:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Evolution Webhook Receiver ──
+  app.post("/webhooks/evolution", async (req, res) => {
+    try {
+      const secret = (req.headers["x-webhook-secret"] as string) || "";
+      if (!verifyWebhookSecret(secret)) {
+        return res.status(403).json({ error: "Invalid webhook secret" });
+      }
+
+      const { event, instance } = req.body || {};
+      console.log("Evolution webhook:", event, instance);
+
+      if (!instance) return res.status(200).json({ received: true });
+
+      const db = requireSupabase(res);
+      if (!db) return res.status(200).json({ received: true });
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("user_id")
+        .eq("instance_name", instance)
+        .maybeSingle();
+
+      if (!conn) return res.status(200).json({ received: true });
+
+      // Handle connection updates
+      if (event === "CONNECTION_UPDATE" || event === "QRCODE_UPDATED") {
+        const body = req.body?.data || req.body;
+        const state = normalizeEvolutionState(body?.state || body?.statusReason || "close");
+        await db.from("whatsapp_connections")
+          .update({
+            status: state,
+            phone_number: body?.phoneNumber || body?.number || undefined,
+            last_connection_state: body?.state || body?.statusReason || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", conn.user_id);
+      }
+
+      // Handle incoming messages — forward to agent
+      if (event === "MESSAGES_UPSERT") {
+        const msg = req.body?.data || req.body;
+        if (msg?.key?.fromMe) {
+          return res.status(200).json({ received: true }); // skip own messages
+        }
+
+        const messageText =
+          msg?.message?.conversation ||
+          msg?.message?.extendedTextMessage?.text ||
+          msg?.message?.imageMessage?.caption ||
+          "";
+
+        const senderNumber = msg?.key?.remoteJid?.split("@")[0] || "unknown";
+
+        if (messageText) {
+          console.log(
+            `WhatsApp incoming [${conn.user_id}]: ${senderNumber}: ${messageText}`,
+          );
+
+          // Store incoming as a conversation turn for agent context
+          try {
+            const { error: insertErr } = await db.from("conversations").insert({
+              uid: conn.user_id,
+              session_id: `whatsapp_${instance}`,
+              role: "user",
+              content: `[WhatsApp ${senderNumber}] ${messageText}`,
+              source: "whatsapp",
+              created_at: new Date().toISOString(),
+            });
+            if (insertErr) console.warn("Failed to log WhatsApp turn:", insertErr.message);
+          } catch (e: any) {
+            console.warn("Failed to log WhatsApp turn:", e.message);
+          }
+        }
+      }
+
+      res.status(200).json({ received: true });
+    } catch (err: any) {
+      console.error("Webhook error:", err.message);
+      res.status(200).json({ received: true }); // Always 200 to avoid retries
+    }
+  });
+
+  //
   // Load scheduled automations on startup
   loadAndScheduleAll();
 

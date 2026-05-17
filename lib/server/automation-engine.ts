@@ -1,18 +1,23 @@
-import cron from "node-cron";
+import cron, { type ScheduledTask } from "node-cron";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { runHermesAgent } from "./vps-bridge";
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey) : null;
+// Lazy singleton — env vars are not yet available at import time because
+// dotenv.config() runs after the import in server.ts.
+let _supabase: ReturnType<typeof createClient> | null = null;
 
 function getSupabase() {
-  if (!supabase) throw new Error("Supabase not configured");
-  return supabase;
+  if (!_supabase) {
+    const url = process.env.SUPABASE_URL || "";
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    if (!url || !key) throw new Error("Supabase not configured");
+    _supabase = createClient(url, key);
+  }
+  return _supabase;
 }
 
-const scheduledJobs = new Map<string, cron.ScheduledTask>();
+const scheduledJobs = new Map<string, ScheduledTask>();
 
 export function buildHermesWorkflowPrompt(input: {
   title: string;
@@ -63,7 +68,6 @@ export async function createAutomation(input: {
   output?: Record<string, any>;
 }) {
   const db = getSupabase();
-  const now = new Date();
   const nextRunAt = computeNextRun(input.schedule.type, input.schedule.time);
 
   const { data, error } = await db
@@ -78,7 +82,7 @@ export async function createAutomation(input: {
       output: input.output || {},
       status: "active",
       next_run_at: nextRunAt?.toISOString() || null,
-    })
+    } as any)
     .select()
     .single();
 
@@ -124,19 +128,19 @@ export async function updateAutomation(
   }
   updates.updated_at = new Date().toISOString();
 
-  const { data, error } = await db
-    .from("automations")
+  const { data, error } = await (db.from("automations") as any)
     .update(updates)
     .eq("id", id)
     .eq("uid", uid)
     .select()
     .single();
   if (error) throw error;
+  if (!data) throw new Error("Automation not found after update");
 
-  if (data.status === "active") {
+  if ((data as any).status === "active") {
     scheduleAutomation(data);
   } else {
-    unscheduleAutomation(data.id);
+    unscheduleAutomation((data as any).id);
   }
 
   return data;
@@ -183,7 +187,7 @@ async function executeAutomationRun(automation: any) {
       status: "running",
       started_at: startedAt.toISOString(),
       logs: JSON.stringify([{ ts: startedAt.toISOString(), msg: "Hermes workflow started" }]),
-    })
+    } as any)
     .select()
     .single();
   if (insertError) throw insertError;
@@ -200,22 +204,20 @@ async function executeAutomationRun(automation: any) {
     const result = await runHermesAgent({ prompt, timeoutMs: 180000 });
 
     const finishedAt = new Date();
-    const { error: updateError } = await db
-      .from("automation_runs")
+    const { error: updateError } = await (db.from("automation_runs") as any)
       .update({
         status: "completed",
         finished_at: finishedAt.toISOString(),
         result: result,
         logs: JSON.stringify([
-          ...(JSON.parse(run.logs as string) || []),
+          ...(JSON.parse((run as any).logs as string) || []),
           { ts: finishedAt.toISOString(), msg: "Hermes completed" },
         ]),
       })
-      .eq("id", run.id);
+      .eq("id", (run as any).id);
     if (updateError) console.error("Update run error:", updateError);
 
-    await db
-      .from("automations")
+    await (db.from("automations") as any)
       .update({
         last_run_at: finishedAt.toISOString(),
         next_run_at: computeNextRun(
@@ -225,21 +227,20 @@ async function executeAutomationRun(automation: any) {
       })
       .eq("id", automation.id);
 
-    return { runId: run.id, status: "completed", result };
+    return { runId: (run as any).id, status: "completed", result };
   } catch (err: any) {
     const finishedAt = new Date();
-    await db
-      .from("automation_runs")
+    await (db.from("automation_runs") as any)
       .update({
         status: "failed",
         finished_at: finishedAt.toISOString(),
         error: err.message || String(err),
         logs: JSON.stringify([
-          ...(JSON.parse(run.logs as string) || []),
+          ...(JSON.parse((run as any).logs as string) || []),
           { ts: finishedAt.toISOString(), msg: `Failed: ${err.message}` },
         ]),
       })
-      .eq("id", run.id);
+      .eq("id", (run as any).id);
     throw err;
   }
 }
