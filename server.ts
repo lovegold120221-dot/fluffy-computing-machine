@@ -7,6 +7,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fs from "fs";
 import { z } from "zod";
+import ws from "ws";
 import {
   generateWithOllama,
   getVpsStatus,
@@ -76,6 +77,9 @@ const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
+  },
+  realtime: {
+    transport: ws,
   },
 }) : null;
 
