@@ -905,6 +905,8 @@ ${memoryStr || `No previous history yet. This is your first time meeting ${userC
 CURRENT SIGNED-IN USER PROFILE:
 ${profileContext || `Only the current Firebase-authenticated user is active.`}
 
+${whatsappContactsStr}
+
 RECENT CONVERSATION HISTORY (Last Session):
 ${historyStr || `No previous conversation history.`}
 
