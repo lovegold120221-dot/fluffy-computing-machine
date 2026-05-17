@@ -154,8 +154,22 @@ export function useLiveApi({
           let t = useAuth.getState().googleAccessToken;
           if (t) return t;
           try {
+            const idToken = await auth.currentUser?.getIdToken() || "";
+            // Try to refresh expired token first
+            const refreshResp = await fetch("/api/google-token/refresh", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (refreshResp.ok) {
+              const refreshed = await refreshResp.json();
+              if (refreshed.access_token) {
+                useAuth.getState().setGoogleAccessToken(refreshed.access_token);
+                return refreshed.access_token;
+              }
+            }
+            // Fallback: fetch stored token
             const resp = await fetch("/api/google-token", {
-              headers: { Authorization: `Bearer ${await auth.currentUser?.getIdToken() || ""}` },
+              headers: { Authorization: `Bearer ${idToken}` },
             });
             if (resp.ok) {
               const json = await resp.json();

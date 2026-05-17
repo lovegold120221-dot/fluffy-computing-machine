@@ -867,8 +867,15 @@ export const useAuth = create<{
   googleAccessToken: string | null;
   setGoogleAccessToken: (token: string | null) => void;
 }>(set => ({
-  googleAccessToken: null,
-  setGoogleAccessToken: token => set({ googleAccessToken: token }),
+  googleAccessToken: typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null,
+  setGoogleAccessToken: token => {
+    if (token) {
+      localStorage.setItem('google_access_token', token);
+    } else {
+      localStorage.removeItem('google_access_token');
+    }
+    set({ googleAccessToken: token });
+  },
 }));
 
 /**

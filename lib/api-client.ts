@@ -327,21 +327,31 @@ export async function fetchAutomationRuns(id: string) {
 
 // ── Google Token Persistence (Supabase) ──
 
-export async function saveGoogleToken(accessToken: string, expiresAt?: number) {
+export async function saveGoogleToken(accessToken: string, refreshToken?: string, expiresAt?: number) {
   const headers = await getHeaders();
   const res = await fetch("/api/google-token", {
     method: "POST",
     headers,
-    body: JSON.stringify({ access_token: accessToken, expires_at: expiresAt }),
+    body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, expires_at: expiresAt }),
   });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to save Google token"));
   return res.json();
 }
 
-export async function fetchGoogleToken(): Promise<{ access_token: string; expires_at?: number }> {
+export async function fetchGoogleToken(): Promise<{ access_token: string; refresh_token?: string; expires_at?: number }> {
   const headers = await getHeaders();
   const res = await fetch("/api/google-token", { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch Google token"));
+  return res.json();
+}
+
+export async function refreshGoogleToken(): Promise<{ access_token: string; expires_at?: number }> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/google-token/refresh", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to refresh Google token"));
   return res.json();
 }
 

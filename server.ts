@@ -106,6 +106,39 @@ const isMissingSupabaseColumn = (error: any) => {
 
 const normalizeRole = (role: string) => role === "assistant" ? "agent" : role;
 
+async function refreshGoogleToken(refreshToken: string): Promise<{ access_token: string; expires_at: number } | null> {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientSecret) {
+    console.warn("GOOGLE_CLIENT_SECRET not set — cannot refresh Google token");
+    return null;
+  }
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Google token refresh failed:", errText);
+    return null;
+  }
+
+  const data = await res.json();
+  return {
+    access_token: data.access_token,
+    expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+  };
+}
+
 async function syncFirebaseUserToSupabase(user: admin.auth.DecodedIdToken) {
   if (!supabase) return;
 
@@ -298,14 +331,13 @@ async function startServer() {
   // Google Token Persistence (Supabase)
   app.post("/api/google-token", authenticateToken, async (req: any, res) => {
     try {
-      const { access_token, expires_at } = req.body || {};
+      const { access_token, refresh_token, expires_at } = req.body || {};
       if (!access_token) return jsonError(res, 400, "MISSING_TOKEN", "access_token is required.");
       const uid = req.user?.uid;
       if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
       const db = requireSupabase(res);
       if (!db) return;
 
-      // Try to create table if it doesn't exist
       try {
         await db.from("google_tokens").select("uid").limit(1);
       } catch {
@@ -318,6 +350,7 @@ async function startServer() {
         .upsert({
           uid,
           access_token,
+          refresh_token: refresh_token || null,
           expires_at: expires_at || null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "uid" });
@@ -339,12 +372,66 @@ async function startServer() {
       if (!db) return;
       const { data, error } = await db
         .from("google_tokens")
-        .select("access_token, expires_at")
+        .select("access_token, refresh_token, expires_at")
         .eq("uid", uid)
         .maybeSingle();
       if (error) return jsonError(res, 500, "DB_ERROR", error.message);
       if (!data) return jsonError(res, 404, "NOT_FOUND", "No Google token stored for this user.");
+
+      // Auto-refresh if expired and we have a refresh token
+      const now = Date.now();
+      const expiresAt = data.expires_at;
+      if (expiresAt && now >= expiresAt && data.refresh_token) {
+        try {
+          const refreshed = await refreshGoogleToken(data.refresh_token);
+          if (refreshed) {
+            await db.from("google_tokens").update({
+              access_token: refreshed.access_token,
+              expires_at: refreshed.expires_at,
+              updated_at: new Date().toISOString(),
+            }).eq("uid", uid);
+            return res.json({ access_token: refreshed.access_token, expires_at: refreshed.expires_at });
+          }
+        } catch (refreshErr: any) {
+          console.warn("Google token refresh failed, returning stale token:", refreshErr.message);
+        }
+      }
+
       res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  app.post("/api/google-token/refresh", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data } = await db
+        .from("google_tokens")
+        .select("refresh_token")
+        .eq("uid", uid)
+        .maybeSingle();
+
+      if (!data?.refresh_token) {
+        return jsonError(res, 400, "NO_REFRESH_TOKEN", "No refresh token available. Please re-authenticate with Google.");
+      }
+
+      const refreshed = await refreshGoogleToken(data.refresh_token);
+      if (!refreshed) {
+        return jsonError(res, 500, "REFRESH_FAILED", "Failed to refresh Google token. Please re-authenticate.");
+      }
+
+      await db.from("google_tokens").update({
+        access_token: refreshed.access_token,
+        expires_at: refreshed.expires_at,
+        updated_at: new Date().toISOString(),
+      }).eq("uid", uid);
+
+      res.json({ access_token: refreshed.access_token, expires_at: refreshed.expires_at });
     } catch (err: any) {
       res.status(500).json({ error: String(err.message || err) });
     }

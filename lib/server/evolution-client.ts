@@ -158,7 +158,7 @@ export async function restartInstance(instanceName: string): Promise<any> {
 
 /**
  * Search WhatsApp messages from a contact.
- * Note: Evolution API doesn't have direct search, so we fetch recent messages.
+ * Uses Evolution API v2 /chat/findMessages endpoint.
  */
 export async function searchWhatsAppMessages(
   instanceName: string,
@@ -167,22 +167,27 @@ export async function searchWhatsAppMessages(
   limit: number = 20,
 ): Promise<{ messages: WhatsAppMessage[]; count: number }> {
   const chatId = `${phoneNumber}@s.whatsapp.net`;
-  
-  // Fetch recent messages for this contact
-  const messagesResponse = await evolutionRequest<{ messages: WhatsAppMessage[] }>(
-    `/message/findMessages/${instanceName}`,
+
+  const messagesResponse = await evolutionRequest<{
+    messages?: { records?: WhatsAppMessage[]; total?: number };
+  }>(
+    `/chat/findMessages/${instanceName}`,
     {
       method: "POST",
       body: JSON.stringify({
-        number: phoneNumber,
-        count: limit,
+        where: {
+          key: { remoteJid: chatId },
+        },
+        limit,
       }),
-    }
+    },
   );
 
-  let messages = messagesResponse.messages || [];
+  let messages = messagesResponse.messages?.records || messagesResponse.messages as any || [];
+  if (!Array.isArray(messages)) {
+    messages = [];
+  }
 
-  // Filter by query if provided
   if (query) {
     messages = messages.filter(msg => {
       const msgText = JSON.stringify(msg).toLowerCase();
@@ -198,6 +203,7 @@ export async function searchWhatsAppMessages(
 
 /**
  * Read/retrieve chat history with a contact.
+ * Uses Evolution API v2 /chat/findMessages endpoint.
  */
 export async function readWhatsAppChat(
   instanceName: string,
@@ -205,20 +211,29 @@ export async function readWhatsAppChat(
   limit: number = 30,
 ): Promise<{ messages: WhatsAppMessage[]; contactId: string }> {
   const chatId = `${phoneNumber}@s.whatsapp.net`;
-  
-  const messagesResponse = await evolutionRequest<{ messages: WhatsAppMessage[] }>(
-    `/message/findMessages/${instanceName}`,
+
+  const messagesResponse = await evolutionRequest<{
+    messages?: { records?: WhatsAppMessage[]; total?: number };
+  }>(
+    `/chat/findMessages/${instanceName}`,
     {
       method: "POST",
       body: JSON.stringify({
-        number: phoneNumber,
-        count: limit,
+        where: {
+          key: { remoteJid: chatId },
+        },
+        limit,
       }),
-    }
+    },
   );
 
+  let messages = messagesResponse.messages?.records || messagesResponse.messages as any || [];
+  if (!Array.isArray(messages)) {
+    messages = [];
+  }
+
   return {
-    messages: messagesResponse.messages || [],
+    messages: messages.slice(0, limit),
     contactId: chatId,
   };
 }
