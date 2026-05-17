@@ -91,7 +91,6 @@ export default function EburonApp() {
   const [isAddingMemory, setIsAddingMemory] = useState<boolean>(false);
   const [newMemoryValue, setNewMemoryValue] = useState<string>('');
   const [newMemoryType, setNewMemoryType] = useState<string>('personal');
-  const [pendingMemory, setPendingMemory] = useState<{ content: string; type: string; id?: string } | null>(null);
   const [memorySuccessMsg, setMemorySuccessMsg] = useState<string | null>(null);
 
   // Session & Timer State
@@ -366,12 +365,17 @@ export default function EburonApp() {
               };
             }
 
-            // Instead of saving immediately, we trigger a confirmation modal
-            setPendingMemory({ content, type, id: fc.id });
-            return {
-              id: fc.id,
-              response: { success: true, status: "Awaiting user confirmation in UI." }
-            };
+            try {
+              await api.saveMemory(content, type);
+              const memoryList = await api.fetchMemories();
+              setMemories(memoryList);
+              return {
+                id: fc.id,
+                response: { success: true, status: "Memory saved." }
+              };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
           }
 
           if (fc.name === 'run_vps_command') {
@@ -921,21 +925,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       setTimeout(() => setMemorySuccessMsg(null), 3000);
     } catch (e) {
       console.error("Error adding memory:", e);
-    }
-  };
-
-  const handleConfirmPendingMemory = async (type: string) => {
-    if (!pendingMemory) return;
-    try {
-      await api.saveMemory(pendingMemory.content, type);
-      const memoryList = await api.fetchMemories();
-      setMemories(memoryList);
-      setPendingMemory(null);
-
-      setMemorySuccessMsg(`Memory saved as ${type}!`);
-      setTimeout(() => setMemorySuccessMsg(null), 3000);
-    } catch (e) {
-      console.error("Error saving pending memory:", e);
     }
   };
 
@@ -1662,6 +1651,26 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <button type="submit" className="auth-submit-btn">{isSignupMode ? 'Sign up' : 'Sign in'}</button>
           </form>
 
+          {!isSignupMode && (
+            <div className="auth-links" style={{ display: "flex", gap: "16px", marginTop: "12px", fontSize: "13px" }}>
+              <span style={{ color: "var(--accent-primary)", cursor: "pointer", fontWeight: 600 }} onClick={() => setIsSignupMode(true)}>Create account</span>
+              <span style={{ color: "var(--text-muted)", cursor: "pointer" }} onClick={async () => {
+                if (!email) { setAuthError("Enter your email first."); return; }
+                try {
+                  const { sendPasswordResetEmail } = await import('firebase/auth');
+                  await sendPasswordResetEmail(auth, email);
+                  setAuthError("Password reset email sent!");
+                } catch (err: any) { setAuthError(err.message); }
+              }}>Reset password</span>
+            </div>
+          )}
+
+          {isSignupMode && (
+            <div className="auth-toggle" style={{ marginTop: "12px", fontSize: "13px", color: "var(--text-muted)" }}>
+              Already have an account? <span style={{ color: "var(--accent-primary)", fontWeight: 600, cursor: "pointer" }} onClick={() => setIsSignupMode(false)}>Sign in</span>
+            </div>
+          )}
+
           <div className="auth-divider"><span>or</span></div>
 
           <button className="btn-google" onClick={handleGoogleLogin}>
@@ -1670,95 +1679,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           </button>
         </div>
       </div>
-
-      {/* Memory Confirmation Modal */}
-      {pendingMemory && (
-        <div className="confirm-modal-overlay" style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          zIndex: 2000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div className="confirm-modal" style={{
-            backgroundColor: 'var(--bg-card)',
-            width: '100%',
-            maxWidth: '400px',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color)',
-            overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-            animation: 'slideUp 0.3s ease-out'
-          }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Save to Memory?</h3>
-              <button title="Dismiss memory" onClick={() => setPendingMemory(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ph ph-x"></i></button>
-            </div>
-            <div style={{ padding: '24px' }}>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>Beatrice wants to store a new memory of this insight:</p>
-              <div className="memory-preview-box" style={{
-                padding: '16px',
-                borderRadius: '12px',
-                background: 'rgba(255,255,255,0.03)',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                marginBottom: '24px',
-                fontStyle: 'italic',
-                borderLeft: '4px solid var(--accent-active)',
-                color: '#fff',
-                position: 'relative'
-              }}>
-                <i className="ph ph-quotes" style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.1, fontSize: '24px' }}></i>
-                "{pendingMemory.content}"
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '28px' }}>
-                <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', display: 'block', color: 'var(--text-muted)' }}>Classify this Memory</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {['personal', 'work', 'project'].map(cat => (
-                    <button
-                      key={cat}
-                      className={`cat-btn ${newMemoryType === cat ? 'active' : ''}`}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: `1px solid ${newMemoryType === cat ? 'var(--accent-active)' : 'var(--border-color)'}`,
-                        background: newMemoryType === cat ? 'rgba(203,251,69,0.1)' : 'transparent',
-                        color: newMemoryType === cat ? 'var(--accent-active)' : 'var(--text-muted)',
-                        fontSize: '12px',
-                        textTransform: 'capitalize',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onClick={() => setNewMemoryType(cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  className="btn-secondary"
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
-                  onClick={() => setPendingMemory(null)}
-                >Discard</button>
-                <button
-                  className="btn-primary"
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)', fontWeight: 600 }}
-                  onClick={() => {
-                    handleConfirmPendingMemory(newMemoryType);
-                  }}
-                >Save Memory</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

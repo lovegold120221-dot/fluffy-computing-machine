@@ -232,7 +232,9 @@ export class AudioStreamer {
     );
 
     setTimeout(() => {
-      this.gainNode.disconnect();
+      this.gainNode.gain.setValueAtTime(0, this.context.currentTime);
+    this.gainNode.gain.setValueAtTime(0, this.context.currentTime);
+    this.gainNode.disconnect();
       this.gainNode = this.context.createGain();
       this.gainNode.connect(this.context.destination);
     }, 200);
