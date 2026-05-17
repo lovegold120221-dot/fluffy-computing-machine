@@ -21,36 +21,36 @@ export default function EburonApp() {
   const [name, setName] = useState('');
   const [authError, setAuthError] = useState('');
   const [hasConsented, setHasConsented] = useState(false);
-  
+
   const { client, connect, disconnect, connected, volume, setConfig } = useLiveAPIContext();
   const turns = useLogStore((state) => state.turns);
   const tools = useTools((state) => state.tools);
   const setTemplate = useTools((state) => state.setTemplate);
-  
-  const { 
-    voice, setVoice, 
+
+  const {
+    voice, setVoice,
     language, setLanguage,
     personaName, setPersonaName,
     userCallName, setUserCallName,
     systemPrompt, setSystemPrompt,
     model
   } = useSettings();
-  
+
   const activeWorkspaceResult = useUI((state) => state.activeWorkspaceResult);
   const setActiveWorkspaceResult = useUI((state) => state.setActiveWorkspaceResult);
-  
+
   const [micState, setMicState] = useState(false);
   const [clientVolume, setClientVolume] = useState(0);
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [activeTasks, setActiveTasks] = useState<Array<{ taskId: string; description: string; status: string }>>([]);
 
-  const { stream, videoRef, isWebcamActive, isScreenShareActive, startWebcam, startScreenShare, stopStream } = useVideoStream();
+  const { stream, videoRef, isWebcamActive, isScreenShareActive, facingMode, flipCamera, stopStream, isRecording, recordingPaused, startRecording, togglePauseRecording, takeSnapshot } = useVideoStream();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgAudioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (bgAudioRef.current) {
-      bgAudioRef.current.volume = 0.15;
+     bgAudioRef.current.volume = 0.15;
       if (connected) {
         bgAudioRef.current.play().catch(err => console.log("Bg audio play blocked until interaction:", err));
       } else {
@@ -80,7 +80,7 @@ export default function EburonApp() {
   const [newMemoryType, setNewMemoryType] = useState<string>('personal');
   const [pendingMemory, setPendingMemory] = useState<{ content: string; type: string; id?: string } | null>(null);
   const [memorySuccessMsg, setMemorySuccessMsg] = useState<string | null>(null);
-  
+
   // Session & Timer State
   const [sessionID, setSessionID] = useState<string>(() => Math.random().toString(36).substring(7));
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -109,88 +109,88 @@ export default function EburonApp() {
   useEffect(() => {
     // testConnection(); // Firestore specific, skipping for now as we use Postgres
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-       // Diagnostic health check
-       try {
-         const health = await fetch("/api/health").then(r => r.json());
-         console.log("Backend health check:", health);
-       } catch (err) {
-         console.error("Backend health check failed (is the server running?):", err);
-       }
+      // Diagnostic health check
+      try {
+        const health = await fetch("/api/health").then(r => r.json());
+        console.log("Backend health check:", health);
+      } catch (err) {
+        console.error("Backend health check failed (is the server running?):", err);
+      }
 
-       if (user) {
-          setIsAuthOpen(false);
-          setActiveOverlay(null);
-          
+      if (user) {
+        setIsAuthOpen(false);
+        setActiveOverlay(null);
+
+        try {
+          // Fetch Settings
+          const settings = await api.fetchSettings();
+          setPersonaName(settings.persona_name);
+          setUserCallName(settings.user_call_name);
+          setSystemPrompt(settings.system_prompt);
+          setVoice(settings.voice);
+          setLanguage(settings.language);
+
+          // Fetch memories
+          const memoryList = await api.fetchMemories();
+          setMemories(memoryList);
+
+          // Fetch previous conversations
           try {
-            // Fetch Settings
-            const settings = await api.fetchSettings();
-            setPersonaName(settings.persona_name);
-            setUserCallName(settings.user_call_name);
-            setSystemPrompt(settings.system_prompt);
-            setVoice(settings.voice);
-            setLanguage(settings.language);
-
-            // Fetch memories
-            const memoryList = await api.fetchMemories();
-            setMemories(memoryList);
-
-            // Fetch previous conversations
-            try {
-              const { turns, addTurn } = useLogStore.getState();
-              if (turns.length === 0) {
-                 const prevTurns = await api.fetchConversations(200);
-                 if (prevTurns && prevTurns.length > 0) {
-                     prevTurns.forEach((t: any) => {
-                        addTurn({
-                          role: t.role,
-                          text: t.content,
-                          isFinal: true,
-                          timestamp: t.created_at ? new Date(t.created_at) : new Date()
-                       });
-                     });
-                 }
+            const { turns, addTurn } = useLogStore.getState();
+            if (turns.length === 0) {
+              const prevTurns = await api.fetchConversations(200);
+              if (prevTurns && prevTurns.length > 0) {
+                prevTurns.forEach((t: any) => {
+                  addTurn({
+                    role: t.role,
+                    text: t.content,
+                    isFinal: true,
+                    timestamp: t.created_at ? new Date(t.created_at) : new Date()
+                  });
+                });
               }
-            } catch (err: any) {
-              console.error("Failed to load history:", err);
-              setHistoryError(err.message);
             }
-          } catch (e) {
-            console.error("Error loading user data from Postgres:", e);
+          } catch (err: any) {
+            console.error("Failed to load history:", err);
+            setHistoryError(err.message);
           }
-       } else {
-          setIsAuthOpen(true);
-          setMemories([]);
-       }
+        } catch (e) {
+          console.error("Error loading user data from Postgres:", e);
+        }
+      } else {
+        setIsAuthOpen(true);
+        setMemories([]);
+      }
     });
     return () => unsubscribe();
   }, [setPersonaName, setUserCallName, setSystemPrompt, setVoice, setLanguage]);
 
   const hasStartedRef = useRef(false);
-  
+
   // Track silence for 15s filler
   const lastUserSpeechTime = useRef(Date.now());
   const fillerTriggeredRef = useRef(false);
   const aiIsSpeakingRef = useRef(false);
 
   useEffect(() => {
-     if (clientVolume > 0.01) {
-        lastUserSpeechTime.current = Date.now();
-        fillerTriggeredRef.current = false;
-     }
+    if (clientVolume > 0.01) {
+      lastUserSpeechTime.current = Date.now();
+      fillerTriggeredRef.current = false;
+    }
   }, [clientVolume]);
 
   useEffect(() => {
-     if (volume > 0.05) {
-        // AI is speaking, reset the silence timer so we count 15s from AFTER it stops
-        aiIsSpeakingRef.current = true;
-        lastUserSpeechTime.current = Date.now();
-        fillerTriggeredRef.current = false;
-     } else {
-        if (aiIsSpeakingRef.current) {
-           aiIsSpeakingRef.current = false;
-           lastUserSpeechTime.current = Date.now(); // Start timer exactly when AI stops
-        }
-     }
+    if (volume > 0.05) {
+      // AI is speaking, reset the silence timer so we count 15s from AFTER it stops
+      aiIsSpeakingRef.current = true;
+      lastUserSpeechTime.current = Date.now();
+      fillerTriggeredRef.current = false;
+    } else {
+      if (aiIsSpeakingRef.current) {
+        aiIsSpeakingRef.current = false;
+        lastUserSpeechTime.current = Date.now(); // Start timer exactly when AI stops
+      }
+    }
   }, [volume]);
 
   // Accumulated text for the current in-progress turn
@@ -311,9 +311,9 @@ export default function EburonApp() {
         updateLastTurn({ isFinal: true });
         // Save turn to backend
         if (last.role === 'agent') {
-           api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
+          api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
         } else if (last.role === 'user') {
-           api.saveConversationTurn('user', last.text, sessionID).catch(console.error);
+          api.saveConversationTurn('user', last.text, sessionID).catch(console.error);
         }
       }
       // Reset accumulators for the next exchange
@@ -336,16 +336,16 @@ export default function EburonApp() {
         functionCalls.map(async (fc: any) => {
           // Log the function call in the UI as a system turn
           useLogStore.getState().addTurn({
-             role: 'system',
-             text: `Executed ${fc.name}`,
-             toolName: fc.name,
-             isFinal: true
+            role: 'system',
+            text: `Executed ${fc.name}`,
+            toolName: fc.name,
+            isFinal: true
           });
 
           if (fc.name === 'save_memory') {
             const content = fc.args.content || fc.args.memory;
             const type = fc.args.type || 'personal';
-            
+
             if (!content) {
               return {
                 id: fc.id,
@@ -469,74 +469,74 @@ export default function EburonApp() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-     if (connected) {
-        interval = setInterval(() => {
-           // Increment timer
-           setTimerSeconds(prev => {
-              const next = prev + 1;
-              
-              // 19:00 Warning
-              if (next === 1140 && !warnedAt19Ref.current) {
-                 warnedAt19Ref.current = true;
-                 client.send([{ text: "SYSTEM: It is now the 19 minute mark of the session. Calmly and warmly inform the user that the session will be cut in about 60 seconds due to technical limits, but they can always reconnect right back. Say it naturally." }]);
-              }
+    if (connected) {
+      interval = setInterval(() => {
+        // Increment timer
+        setTimerSeconds(prev => {
+          const next = prev + 1;
 
-              // 19:50 Goodbye
-              if (next === 1190 && !warnedAt1950Ref.current) {
-                 warnedAt1950Ref.current = true;
-                 client.send([{ text: "SYSTEM: 19:50 mark reached. Say a final, warm goodbye as the session is about to be terminated in 10 seconds. Pick up from current context." }]);
-              }
+          // 19:00 Warning
+          if (next === 1140 && !warnedAt19Ref.current) {
+            warnedAt19Ref.current = true;
+            client.send([{ text: "SYSTEM: It is now the 19 minute mark of the session. Calmly and warmly inform the user that the session will be cut in about 60 seconds due to technical limits, but they can always reconnect right back. Say it naturally." }]);
+          }
 
-              // 20:00 Terminate
-              if (next >= 1200) {
-                 disconnect();
-              }
+          // 19:50 Goodbye
+          if (next === 1190 && !warnedAt1950Ref.current) {
+            warnedAt1950Ref.current = true;
+            client.send([{ text: "SYSTEM: 19:50 mark reached. Say a final, warm goodbye as the session is about to be terminated in 10 seconds. Pick up from current context." }]);
+          }
 
-              return next;
-           });
+          // 20:00 Terminate
+          if (next >= 1200) {
+            disconnect();
+          }
 
-           if (!fillerTriggeredRef.current && !aiIsSpeakingRef.current) {
-              const now = Date.now();
-              if (now - lastUserSpeechTime.current > 15000) {
-                 fillerTriggeredRef.current = true;
-                 client.send([{ text: "The user has been silent for 15 seconds. Since you are human-like and were relaxing in the silence, make a soft, sleepy moan or a gentle human sigh, then say something very short and casual—like you were just waking up or zoning out. Drawing upon previous context. Do NOT ask if they need help." }]);
-              }
-           }
-        }, 1000);
-     } else {
-        setTimerSeconds(0);
-        warnedAt19Ref.current = false;
-        warnedAt1950Ref.current = false;
-     }
-     return () => clearInterval(interval);
-   }, [connected, client, disconnect]);
+          return next;
+        });
 
-   useEffect(() => {
-     if (!connected) { setActiveTasks([]); return; }
-     const interval = setInterval(async () => {
-       try {
-         const tasks = await api.fetchActiveTasks();
-         setActiveTasks(tasks);
-       } catch {}
-     }, 3000);
-     return () => clearInterval(interval);
-   }, [connected]);
+        if (!fillerTriggeredRef.current && !aiIsSpeakingRef.current) {
+          const now = Date.now();
+          if (now - lastUserSpeechTime.current > 15000) {
+            fillerTriggeredRef.current = true;
+            client.send([{ text: "The user has been silent for 15 seconds. Since you are human-like and were relaxing in the silence, make a soft, sleepy moan or a gentle human sigh, then say something very short and casual—like you were just waking up or zoning out. Drawing upon previous context. Do NOT ask if they need help." }]);
+          }
+        }
+      }, 1000);
+    } else {
+      setTimerSeconds(0);
+      warnedAt19Ref.current = false;
+      warnedAt1950Ref.current = false;
+    }
+    return () => clearInterval(interval);
+  }, [connected, client, disconnect]);
 
-   useEffect(() => {
+  useEffect(() => {
+    if (!connected) { setActiveTasks([]); return; }
+    const interval = setInterval(async () => {
+      try {
+        const tasks = await api.fetchActiveTasks();
+        setActiveTasks(tasks);
+      } catch { }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [connected]);
+
+  useEffect(() => {
     if (connected && client && !hasStartedRef.current) {
-       hasStartedRef.current = true;
-       lastUserSpeechTime.current = Date.now();
-       fillerTriggeredRef.current = false;
-       // AI starts the conversation on connection
-       const pastConversations = turns.filter((t: any) => t.isFinal && t.text && t.role !== 'system').slice(-15).map((t: any) => `${t.role}: ${t.text}`).join('\n');
-       const historyContext = pastConversations ? `\n\nFor context, here is the recent history from our last interaction:\n${pastConversations}` : '';
-       
-       setTimeout(() => {
-         const intro = `Session started. Give a very casual, short greeting as if we are coworkers passing by or jumping on a call. Pick up from any previous context if there is any. Do NOT offer help.${historyContext}`;
-         client.send([{ text: intro }]);
-         // We don't necessarily want to log this "SYSTEM" instruction to the user, but we could log it for debugging if needed.
-         // However, the AI will respond, and THAT will be logged and saved.
-       }, 1000);
+      hasStartedRef.current = true;
+      lastUserSpeechTime.current = Date.now();
+      fillerTriggeredRef.current = false;
+      // AI starts the conversation on connection
+      const pastConversations = turns.filter((t: any) => t.isFinal && t.text && t.role !== 'system').slice(-15).map((t: any) => `${t.role}: ${t.text}`).join('\n');
+      const historyContext = pastConversations ? `\n\nFor context, here is the recent history from our last interaction:\n${pastConversations}` : '';
+
+      setTimeout(() => {
+        const intro = `Session started. Give a very casual, short greeting as if we are coworkers passing by or jumping on a call. Pick up from any previous context if there is any. Do NOT offer help.${historyContext}`;
+        client.send([{ text: intro }]);
+        // We don't necessarily want to log this "SYSTEM" instruction to the user, but we could log it for debugging if needed.
+        // However, the AI will respond, and THAT will be logged and saved.
+      }, 1000);
     }
     if (!connected) {
       hasStartedRef.current = false;
@@ -552,7 +552,7 @@ export default function EburonApp() {
         return { functionDeclarations: [rest] };
       });
 
-    const memoryStr = memories.length > 0 
+    const memoryStr = memories.length > 0
       ? memories.map((m: any) => `- ${m.content} (${m.type})`).join('\n')
       : "";
 
@@ -571,7 +571,8 @@ export default function EburonApp() {
       inputAudioTranscription: { model } as any,
       outputAudioTranscription: { model } as any,
       systemInstruction: {
-        parts: [{ text: `You are a coworker in an office environment, named ${personaName}. The person you are talking to is the Boss, or "${userCallName}".
+        parts: [{
+          text: `You are a coworker in an office environment, named ${personaName}. The person you are talking to is the Boss, or "${userCallName}".
         
 BEHAVIOR PROFILE:
 ${systemPrompt}
@@ -684,7 +685,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         const base64 = (event.target?.result as string).split(',')[1];
         client.sendRealtimeInput([{ mimeType: file.type, data: base64 }]);
         useLogStore.getState().addTurn({ role: 'user', text: `[Sent Image: ${file.name}]`, isFinal: true });
-        client.send({ text: `I have attached an image named ${file.name}. Can you describe it?`});
+        client.send({ text: `I have attached an image named ${file.name}. Can you describe it?` });
       };
       reader.readAsDataURL(file);
     }
@@ -716,36 +717,69 @@ Output only natural spoken text. No stage directions, no brackets, no role label
   };
 
   const handleGoogleLogin = async () => {
-     setAuthError('');
-     if (!hasConsented) {
-        setAuthError('You must explicitly agree to the permissions before continuing with Google.');
-        return;
-     }
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/calendar');
-      provider.addScope('https://www.googleapis.com/auth/gmail.modify');
-      provider.addScope('https://www.googleapis.com/auth/gmail.compose');
-      provider.addScope('https://www.googleapis.com/auth/drive');
-      provider.addScope('https://www.googleapis.com/auth/drive.file');
-      provider.addScope('https://www.googleapis.com/auth/documents');
-      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-      provider.addScope('https://www.googleapis.com/auth/presentations');
-      provider.addScope('https://www.googleapis.com/auth/forms.body');
-      provider.addScope('https://www.googleapis.com/auth/script.projects');
-      provider.addScope('https://www.googleapis.com/auth/tasks');
-      provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-     
-     try {
-        const result = await signInWithPopup(auth, provider);
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential?.accessToken) {
-            useAuth.getState().setGoogleAccessToken(credential.accessToken);
-        }
-     } catch (err: any) {
-        setAuthError(err.message);
-     }
+    setAuthError('');
+    if (!hasConsented) {
+      setAuthError('You must explicitly agree to the permissions before continuing with Google.');
+      return;
+    }
+    const provider = new GoogleAuthProvider();
+    // Workspace — read/write
+    provider.addScope('https://www.googleapis.com/auth/calendar');
+    provider.addScope('https://www.googleapis.com/auth/calendar.events');
+    provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+    provider.addScope('https://www.googleapis.com/auth/gmail.compose');
+    provider.addScope('https://www.googleapis.com/auth/gmail.send');
+    provider.addScope('https://www.googleapis.com/auth/gmail.labels');
+    provider.addScope('https://www.googleapis.com/auth/drive');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    provider.addScope('https://www.googleapis.com/auth/drive.metadata');
+    provider.addScope('https://www.googleapis.com/auth/documents');
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    provider.addScope('https://www.googleapis.com/auth/presentations');
+    provider.addScope('https://www.googleapis.com/auth/forms');
+    provider.addScope('https://www.googleapis.com/auth/script.projects');
+    provider.addScope('https://www.googleapis.com/auth/tasks');
+    provider.addScope('https://www.googleapis.com/auth/contacts');
+    provider.addScope('https://www.googleapis.com/auth/directory.readonly');
+    // People & Profile
+    provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+    provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+    provider.addScope('https://www.googleapis.com/auth/user.phonenumbers.read');
+    provider.addScope('https://www.googleapis.com/auth/user.addresses.read');
+    provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
+    provider.addScope('https://www.googleapis.com/auth/user.gender.read');
+    provider.addScope('https://www.googleapis.com/auth/user.organization.read');
+    // YouTube
+    provider.addScope('https://www.googleapis.com/auth/youtube');
+    provider.addScope('https://www.googleapis.com/auth/youtube.upload');
+    provider.addScope('https://www.googleapis.com/auth/youtubepartner');
+    // Maps, Places, Geocoding, Directions
+    provider.addScope('https://www.googleapis.com/auth/maps');
+    provider.addScope('https://www.googleapis.com/auth/places');
+    // Firebase & GCP Backend
+    provider.addScope('https://www.googleapis.com/auth/firebase');
+    provider.addScope('https://www.googleapis.com/auth/firebase.messaging');
+    provider.addScope('https://www.googleapis.com/auth/firebase.database');
+    provider.addScope('https://www.googleapis.com/auth/firestore');
+    provider.addScope('https://www.googleapis.com/auth/devstorage.read_write');
+    provider.addScope('https://www.googleapis.com/auth/pubsub');
+    provider.addScope('https://www.googleapis.com/auth/cloudfunctions');
+    provider.addScope('https://www.googleapis.com/auth/logging.write');
+    provider.addScope('https://www.googleapis.com/auth/monitoring');
+    provider.addScope('https://www.googleapis.com/auth/cloud-platform');
+    // Chat
+    provider.addScope('https://www.googleapis.com/auth/chat');
+    provider.addScope('https://www.googleapis.com/auth/chat.messages');
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        useAuth.getState().setGoogleAccessToken(credential.accessToken);
+      }
+    } catch (err: any) {
+      setAuthError(err.message);
+    }
   };
 
   const handleSend = () => {
@@ -774,9 +808,9 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       };
       const prompt = prompts[toolId] || `Execute action: ${toolId}`;
       if (connected) {
-         client.send({ text: prompt });
-         useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true });
-         api.saveConversationTurn('user', prompt, sessionID).catch(console.error);
+        client.send({ text: prompt });
+        useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true });
+        api.saveConversationTurn('user', prompt, sessionID).catch(console.error);
       }
       else {
         useLogStore.getState().addTurn({ role: 'user', text: prompt, isFinal: true });
@@ -806,10 +840,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       setIsAddingMemory(false);
       setNewMemoryValue('');
       setNewMemoryType('personal');
-      
+
       setMemorySuccessMsg("Memory added successfully!");
       setTimeout(() => setMemorySuccessMsg(null), 3000);
-    } catch(e) {
+    } catch (e) {
       console.error("Error adding memory:", e);
     }
   };
@@ -821,10 +855,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       const memoryList = await api.fetchMemories();
       setMemories(memoryList);
       setPendingMemory(null);
-      
+
       setMemorySuccessMsg(`Memory saved as ${type}!`);
       setTimeout(() => setMemorySuccessMsg(null), 3000);
-    } catch(e) {
+    } catch (e) {
       console.error("Error saving pending memory:", e);
     }
   };
@@ -838,6 +872,14 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       console.error("Error deleting memory:", e);
     }
   };
+
+  function startScreenShare(event: MouseEvent<HTMLButtonElement, MouseEvent>): void {
+    throw new Error('Function not implemented.');
+  }
+
+  function startWebcam(event: MouseEvent<HTMLButtonElement, MouseEvent>): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div id="app" className="app-container">
@@ -902,10 +944,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         )}
 
         <div className="header-right">
-          <button 
-             onClick={handleConnectToggle} 
-             className="connect-btn"
-             style={{ backgroundColor: connected ? 'var(--accent-active)' : 'var(--accent-primary)' }}
+          <button
+            onClick={handleConnectToggle}
+            className="connect-btn"
+            style={{ backgroundColor: connected ? 'var(--accent-active)' : 'var(--accent-primary)' }}
           >
             <i className="ph-bold ph-plug"></i> <span>{connected ? 'Connected' : 'Connect'}</span>
           </button>
@@ -944,78 +986,78 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         <div id="conversation-container">
           <div className="conversation-message ai">Hey Boss! I'm Beatrice. Connect your session!</div>
           {turns.filter(turn => turn.role !== 'system').map((turn, i) => (
-             <div key={i} className={`conversation-message ${turn.role === 'user' ? 'user' : 'ai'}`}>
-                {turn.text}
-             </div>
+            <div key={i} className={`conversation-message ${turn.role === 'user' ? 'user' : 'ai'}`}>
+              {turn.text}
+            </div>
           ))}
         </div>
       </main>
 
       {/* Bottom Dock */}
-      <audio 
-        ref={bgAudioRef} 
-        src="/freesound_community-121116-bank-interior-ambience-office-doors-footstaps-printer-typing-voices-17642.mp3" 
-        loop 
+      <audio
+        ref={bgAudioRef}
+        src="/freesound_community-121116-bank-interior-ambience-office-doors-footstaps-printer-typing-voices-17642.mp3"
+        loop
       />
       <div className="bottom-dock">
         <div className="input-wrapper">
           <div className="input-bar">
             <button className="attach-btn" title="Attach file" onClick={() => fileInputRef.current?.click()}><i className="ph ph-paperclip"></i></button>
             <input type="file" ref={fileInputRef} title="Upload file" style={{ display: 'none' }} accept="image/*" onChange={handleFileUpload} />
-            <input 
-               type="text" 
-               id="message-input" 
-               title="Message input"
-               placeholder="Message or ask Beatrice..." 
-               value={message}
-               onChange={(e) => setMessage(e.target.value)}
-               onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
-               autoComplete="off" />
+            <input
+              type="text"
+              id="message-input"
+              title="Message input"
+              placeholder="Message or ask Beatrice..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
+              autoComplete="off" />
             <button id="send-button" className="send-btn" title="Send message" onClick={handleSend}><i className="ph-bold ph-paper-plane-right"></i></button>
           </div>
         </div>
         <nav className="nav-controls">
           <button className={`nav-item ${micState ? 'active' : ''}`} onClick={() => setMicState(!micState)}>
-             <div className="icon-wrapper">
-               <div className="icon-pulse" style={{ 
-                 width: micState ? `${28 + clientVolume * 30}px` : '0px', 
-                 height: micState ? `${28 + clientVolume * 30}px` : '0px',
-                 opacity: micState && clientVolume > 0.01 ? 0.3 : 0
-               }}></div>
-               <div className="icon-pulse-ring" style={{ 
-                 width: micState ? `${32 + clientVolume * 50}px` : '0px', 
-                 height: micState ? `${32 + clientVolume * 50}px` : '0px',
-                 opacity: micState && clientVolume > 0.01 ? 0.5 : 0
-               }}></div>
-               <i className={`ph-fill ph-microphone${micState ? '' : '-slash'}`}></i>
-             </div>
-             <span>{micState ? 'Mute' : 'Unmute'}</span>
+            <div className="icon-wrapper">
+              <div className="icon-pulse" style={{
+                width: micState ? `${28 + clientVolume * 30}px` : '0px',
+                height: micState ? `${28 + clientVolume * 30}px` : '0px',
+                opacity: micState && clientVolume > 0.01 ? 0.3 : 0
+              }}></div>
+              <div className="icon-pulse-ring" style={{
+                width: micState ? `${32 + clientVolume * 50}px` : '0px',
+                height: micState ? `${32 + clientVolume * 50}px` : '0px',
+                opacity: micState && clientVolume > 0.01 ? 0.5 : 0
+              }}></div>
+              <i className={`ph-fill ph-microphone${micState ? '' : '-slash'}`}></i>
+            </div>
+            <span>{micState ? 'Mute' : 'Unmute'}</span>
           </button>
 
           <button className={`nav-item ${isScreenShareActive ? 'active' : ''}`} onClick={isScreenShareActive ? stopStream : startScreenShare}>
-             <div className="icon-wrapper">
-               <div className="icon-pulse" style={{ 
-                 width: isScreenShareActive ? `32px` : '0px', 
-                 height: isScreenShareActive ? `32px` : '0px',
-                 opacity: isScreenShareActive ? 0.3 : 0,
-                 animation: isScreenShareActive ? 'pulse-anim 2s infinite' : 'none'
-               }}></div>
-               <i className="ph-fill ph-screencast"></i>
-             </div>
-             <span>{isScreenShareActive ? 'Stop Share' : 'Share Screen'}</span>
+            <div className="icon-wrapper">
+              <div className="icon-pulse" style={{
+                width: isScreenShareActive ? `32px` : '0px',
+                height: isScreenShareActive ? `32px` : '0px',
+                opacity: isScreenShareActive ? 0.3 : 0,
+                animation: isScreenShareActive ? 'pulse-anim 2s infinite' : 'none'
+              }}></div>
+              <i className="ph-fill ph-screencast"></i>
+            </div>
+            <span>{isScreenShareActive ? 'Stop Share' : 'Share Screen'}</span>
           </button>
 
           <button className={`nav-item ${isWebcamActive ? 'active' : ''}`} onClick={isWebcamActive ? stopStream : startWebcam}>
-             <div className="icon-wrapper">
-               <div className="icon-pulse" style={{ 
-                 width: isWebcamActive ? `32px` : '0px', 
-                 height: isWebcamActive ? `32px` : '0px',
-                 opacity: isWebcamActive ? 0.3 : 0,
-                 animation: isWebcamActive ? 'pulse-anim 2s infinite' : 'none'
-               }}></div>
-               <i className={`ph-fill ph-video-camera${isWebcamActive ? '' : '-slash'}`}></i>
-             </div>
-             <span>{isWebcamActive ? 'Stop Cam' : 'Camera'}</span>
+            <div className="icon-wrapper">
+              <div className="icon-pulse" style={{
+                width: isWebcamActive ? `32px` : '0px',
+                height: isWebcamActive ? `32px` : '0px',
+                opacity: isWebcamActive ? 0.3 : 0,
+                animation: isWebcamActive ? 'pulse-anim 2s infinite' : 'none'
+              }}></div>
+              <i className={`ph-fill ph-video-camera${isWebcamActive ? '' : '-slash'}`}></i>
+            </div>
+            <span>{isWebcamActive ? 'Stop Cam' : 'Camera'}</span>
           </button>
           {activeTasks.length > 0 && (
             <div className="task-indicator">
@@ -1036,13 +1078,13 @@ Output only natural spoken text. No stage directions, no brackets, no role label
 
       {/* Video Overlay */}
 
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted 
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
         className={`video-overlay ${isScreenShareActive ? 'screenshare' : 'webcam'}`}
-        style={{ display: stream ? 'block' : 'none' }} 
+        style={{ display: stream ? 'block' : 'none' }}
       />
 
       {/* Workspace & Artifact Overlay */}
@@ -1054,33 +1096,33 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <button className="close-overlay-btn" title="Close workspace" onClick={() => setActiveWorkspaceResult(null)}><i className="ph-bold ph-x"></i></button>
         </div>
         <div className="overlay-content" style={{ overflowY: 'auto', padding: '24px' }}>
-           {activeWorkspaceResult?.artifact ? (
-             <div className="artifact-viewer" style={{ backgroundColor: 'white', color: 'black', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-                {activeWorkspaceResult.artifact.type === 'markdown' && (
-                  <div className="markdown-body">
-                    <ReactMarkdown>{activeWorkspaceResult.artifact.content}</ReactMarkdown>
-                  </div>
-                )}
-                {activeWorkspaceResult.artifact.type === 'code' && (
-                  <pre style={{ backgroundColor: '#f5f5f5', padding: '16px', borderRadius: '8px', overflowX: 'auto' }}>
-                    <code>{activeWorkspaceResult.artifact.content}</code>
-                  </pre>
-                )}
-                {activeWorkspaceResult.artifact.type === 'structured' && (
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{activeWorkspaceResult.artifact.content}</div>
-                )}
-                {activeWorkspaceResult.artifact.type === 'chart' && (
-                  <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
-                    [Chart Visualization Rendering: {activeWorkspaceResult.artifact.title}]
-                    <pre style={{ fontSize: '10px', textAlign: 'left' }}>{activeWorkspaceResult.artifact.content}</pre>
-                  </div>
-                )}
-             </div>
-           ) : (
-             <pre style={{ backgroundColor: '#111', padding: '16px', borderRadius: '8px', color: '#a3f01c', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
-                {activeWorkspaceResult ? JSON.stringify(activeWorkspaceResult, null, 2) : ''}
-             </pre>
-           )}
+          {activeWorkspaceResult?.artifact ? (
+            <div className="artifact-viewer" style={{ backgroundColor: 'white', color: 'black', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+              {activeWorkspaceResult.artifact.type === 'markdown' && (
+                <div className="markdown-body">
+                  <ReactMarkdown>{activeWorkspaceResult.artifact.content}</ReactMarkdown>
+                </div>
+              )}
+              {activeWorkspaceResult.artifact.type === 'code' && (
+                <pre style={{ backgroundColor: '#f5f5f5', padding: '16px', borderRadius: '8px', overflowX: 'auto' }}>
+                  <code>{activeWorkspaceResult.artifact.content}</code>
+                </pre>
+              )}
+              {activeWorkspaceResult.artifact.type === 'structured' && (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{activeWorkspaceResult.artifact.content}</div>
+              )}
+              {activeWorkspaceResult.artifact.type === 'chart' && (
+                <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                  [Chart Visualization Rendering: {activeWorkspaceResult.artifact.title}]
+                  <pre style={{ fontSize: '10px', textAlign: 'left' }}>{activeWorkspaceResult.artifact.content}</pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <pre style={{ backgroundColor: '#111', padding: '16px', borderRadius: '8px', color: '#a3f01c', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
+              {activeWorkspaceResult ? JSON.stringify(activeWorkspaceResult, null, 2) : ''}
+            </pre>
+          )}
         </div>
       </div>
 
@@ -1096,7 +1138,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <h2 style={{ fontSize: '20px' }}>Chief Executive</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>admin@eburon.ai</p>
           </div>
-          
+
           <div className="form-group">
             <label>Persona Background</label>
             <textarea className="form-input" rows={5} placeholder="Tell Beatrice about your business context, communication style..."></textarea>
@@ -1105,8 +1147,8 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <div className="form-group" style={{ marginTop: '24px' }}>
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Stored Memories <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>({memories.length})</span></span>
-              <select 
-                className="form-input" 
+              <select
+                className="form-input"
                 title="Filter by memory type"
                 style={{ width: 'auto', padding: '4px 8px', fontSize: '12px', height: 'auto' }}
                 value={memoryFilter}
@@ -1119,36 +1161,36 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               </select>
             </label>
             <div className="memory-list" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              
+
               {!isAddingMemory ? (
-                 <button 
-                   onClick={() => setIsAddingMemory(true)}
-                   style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
-                 >
-                   + Add New Memory
-                 </button>
+                <button
+                  onClick={() => setIsAddingMemory(true)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  + Add New Memory
+                </button>
               ) : (
-                 <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--accent-primary)' }}>
-                    <textarea 
-                      className="form-input" 
-                      value={newMemoryValue} 
-                      onChange={(e) => setNewMemoryValue(e.target.value)}
-                      placeholder="E.g. I prefer concise answers..."
-                      rows={2}
-                      autoFocus
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <select className="form-input" title="Memory type" style={{ width: '120px', padding: '4px', fontSize: '12px', height: 'auto' }} value={newMemoryType} onChange={(e) => setNewMemoryType(e.target.value)}>
-                         <option value="personal">Personal</option>
-                         <option value="work">Work</option>
-                         <option value="project">Project</option>
-                       </select>
-                       <div style={{ display: 'flex', gap: '8px' }}>
-                         <button className="pill-btn" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => { setIsAddingMemory(false); setNewMemoryValue(''); }}>Cancel</button>
-                         <button className="pill-btn" style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)' }} onClick={handleAddMemory}>Save</button>
-                       </div>
+                <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--accent-primary)' }}>
+                  <textarea
+                    className="form-input"
+                    value={newMemoryValue}
+                    onChange={(e) => setNewMemoryValue(e.target.value)}
+                    placeholder="E.g. I prefer concise answers..."
+                    rows={2}
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <select className="form-input" title="Memory type" style={{ width: '120px', padding: '4px', fontSize: '12px', height: 'auto' }} value={newMemoryType} onChange={(e) => setNewMemoryType(e.target.value)}>
+                      <option value="personal">Personal</option>
+                      <option value="work">Work</option>
+                      <option value="project">Project</option>
+                    </select>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="pill-btn" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => { setIsAddingMemory(false); setNewMemoryValue(''); }}>Cancel</button>
+                      <button className="pill-btn" style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)' }} onClick={handleAddMemory}>Save</button>
                     </div>
-                 </div>
+                  </div>
+                </div>
               )}
 
               {memories.filter((m) => memoryFilter === 'all' || m.type === memoryFilter).length === 0 ? (
@@ -1160,27 +1202,27 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   <div key={m.id} className="memory-item" style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {editingMemoryIndex === m.id ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <textarea 
-                          className="form-input" 
-                          value={editingMemoryValue} 
+                        <textarea
+                          className="form-input"
+                          value={editingMemoryValue}
                           onChange={(e) => setEditingMemoryValue(e.target.value)}
                           rows={2}
                           autoFocus
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <select className="form-input" title="Memory type" style={{ width: '120px', padding: '4px', fontSize: '12px', height: 'auto' }} value={editingMemoryType} onChange={(e) => setEditingMemoryType(e.target.value)}>
-                             <option value="personal">Personal</option>
-                             <option value="work">Work</option>
-                             <option value="project">Project</option>
-                           </select>
+                          <select className="form-input" title="Memory type" style={{ width: '120px', padding: '4px', fontSize: '12px', height: 'auto' }} value={editingMemoryType} onChange={(e) => setEditingMemoryType(e.target.value)}>
+                            <option value="personal">Personal</option>
+                            <option value="work">Work</option>
+                            <option value="project">Project</option>
+                          </select>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button 
-                              className="pill-btn" 
+                            <button
+                              className="pill-btn"
                               style={{ fontSize: '11px', padding: '4px 8px' }}
                               onClick={() => setEditingMemoryIndex(null)}
                             >Cancel</button>
-                            <button 
-                              className="pill-btn" 
+                            <button
+                              className="pill-btn"
                               style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)' }}
                               onClick={() => handleUpdateMemory(m.id, editingMemoryValue, editingMemoryType)}
                             >Save</button>
@@ -1193,7 +1235,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                           <span style={{ fontSize: '13px', lineHeight: '1.4', flex: 1 }}>{m.content}</span>
                           <div style={{ display: 'flex', gap: '4px', marginLeft: '12px' }}>
                             <button title="Edit memory"
-                              className="icon-btn" 
+                              className="icon-btn"
                               style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}
                               onClick={() => {
                                 setEditingMemoryIndex(m.id);
@@ -1204,7 +1246,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                               <i className="ph ph-note-pencil"></i>
                             </button>
                             <button title="Delete memory"
-                              className="icon-btn" 
+                              className="icon-btn"
                               style={{ color: '#ff4d4d', background: 'transparent', border: 'none', cursor: 'pointer' }}
                               onClick={() => handleDeleteMemory(m.id)}
                             >
@@ -1213,15 +1255,15 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                           </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ 
-                             fontSize: '10px', 
-                             color: m.type === 'project' ? '#a855f7' : m.type === 'work' ? '#3b82f6' : 'var(--accent-active)', 
-                             backgroundColor: m.type === 'project' ? 'rgba(168,85,247,0.15)' : m.type === 'work' ? 'rgba(59,130,246,0.15)' : 'rgba(203,251,69,0.1)',
-                             padding: '2px 8px', 
-                             borderRadius: '12px',
-                             textTransform: 'uppercase', 
-                             letterSpacing: '0.5px',
-                             fontWeight: 600
+                          <span style={{
+                            fontSize: '10px',
+                            color: m.type === 'project' ? '#a855f7' : m.type === 'work' ? '#3b82f6' : 'var(--accent-active)',
+                            backgroundColor: m.type === 'project' ? 'rgba(168,85,247,0.15)' : m.type === 'work' ? 'rgba(59,130,246,0.15)' : 'rgba(203,251,69,0.1)',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            fontWeight: 600
                           }}>{m.type || 'Personal'}</span>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(m.created_at || m.updatedAt).toLocaleDateString()}</span>
                         </div>
@@ -1234,27 +1276,27 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           </div>
 
           <button className="save-now-btn" onClick={async (e) => {
-             const btn = e.currentTarget;
-             try {
-               await api.updateSettings({
-                 persona_name: personaName,
-                 user_call_name: userCallName,
-                 system_prompt: systemPrompt,
-                 voice: voice,
-                 language: language
-               });
-               btn.textContent = 'Saved!';
-               setTimeout(() => { btn.textContent = 'Save Now'; setActiveOverlay(null); }, 1500);
-             } catch (err) {
-               console.error("Error saving settings:", err);
-               btn.textContent = "Error!";
-               setTimeout(() => { btn.textContent = "Save Now"; }, 1500);
-             }
+            const btn = e.currentTarget;
+            try {
+              await api.updateSettings({
+                persona_name: personaName,
+                user_call_name: userCallName,
+                system_prompt: systemPrompt,
+                voice: voice,
+                language: language
+              });
+              btn.textContent = 'Saved!';
+              setTimeout(() => { btn.textContent = 'Save Now'; setActiveOverlay(null); }, 1500);
+            } catch (err) {
+              console.error("Error saving settings:", err);
+              btn.textContent = "Error!";
+              setTimeout(() => { btn.textContent = "Save Now"; }, 1500);
+            }
           }}>Save Now</button>
 
-          <div className="danger-action" onClick={() => { 
-             signOut(auth); 
-             useAuth.getState().setGoogleAccessToken(null);
+          <div className="danger-action" onClick={() => {
+            signOut(auth);
+            useAuth.getState().setGoogleAccessToken(null);
           }}>
             Log Out
           </div>
@@ -1276,13 +1318,13 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <label>How to call you</label>
             <input type="text" className="form-input" title="User call name" placeholder="Boss" value={userCallName} onChange={(e) => setUserCallName(e.target.value)} />
           </div>
-          
+
           <div className="form-group">
             <label>Behavior Persona (How does it react? How does it respond?)</label>
-            <textarea 
-              className="form-input" 
-              rows={4} 
-              value={systemPrompt} 
+            <textarea
+              className="form-input"
+              rows={4}
+              value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="e.g. Friendly, patient, and solutions-oriented..."
             />
@@ -1291,22 +1333,22 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <div className="form-group">
             <label>Presets</label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-              <button 
-                className="pill-btn" 
+              <button
+                className="pill-btn"
                 onClick={() => setTemplate('personal-assistant')}
                 style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
               >
                 Personal Assistant
               </button>
-              <button 
-                className="pill-btn" 
+              <button
+                className="pill-btn"
                 onClick={() => setTemplate('customer-support')}
                 style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
               >
                 Customer Support
               </button>
-              <button 
-                className="pill-btn" 
+              <button
+                className="pill-btn"
                 onClick={() => setTemplate('navigation-system')}
                 style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
               >
@@ -1316,37 +1358,37 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           </div>
 
           <div className="form-group">
-             <label>Voice Persona</label>
-             <select className="form-input" title="Voice persona" onChange={(e) => setVoice(e.target.value)} value={voice}>
-                <option value="Aoede">Aoede</option>
-                <option value="Charon">Charon</option>
-                <option value="Fenrir">Fenrir</option>
-                <option value="Kore">Kore</option>
-                <option value="Puck">Puck</option>
-             </select>
+            <label>Voice Persona</label>
+            <select className="form-input" title="Voice persona" onChange={(e) => setVoice(e.target.value)} value={voice}>
+              <option value="Aoede">Aoede</option>
+              <option value="Charon">Charon</option>
+              <option value="Fenrir">Fenrir</option>
+              <option value="Kore">Kore</option>
+              <option value="Puck">Puck</option>
+            </select>
           </div>
           <div className="form-group">
-             <label>Language</label>
-             <select className="form-input" title="Language" onChange={(e) => setLanguage(e.target.value)} value={language}>
-                {LANGUAGES.map((lang) => (
-                   <option key={lang} value={lang}>{lang}</option>
-                ))}
-             </select>
+            <label>Language</label>
+            <select className="form-input" title="Language" onChange={(e) => setLanguage(e.target.value)} value={language}>
+              {LANGUAGES.map((lang) => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
+            </select>
           </div>
           <button className="save-now-btn" onClick={async (e) => {
-             const btn = e.currentTarget;
-             try {
-               await api.updateSettings({
-                 persona_name: personaName,
-                 user_call_name: userCallName,
-                 system_prompt: systemPrompt,
-                 voice: voice,
-                 language: language
-               });
-               setActiveOverlay(null);
-             } catch (err) {
-               console.error("Error saving settings:", err);
-             }
+            const btn = e.currentTarget;
+            try {
+              await api.updateSettings({
+                persona_name: personaName,
+                user_call_name: userCallName,
+                system_prompt: systemPrompt,
+                voice: voice,
+                language: language
+              });
+              setActiveOverlay(null);
+            } catch (err) {
+              console.error("Error saving settings:", err);
+            }
           }}>Save Settings</button>
         </div>
       </div>
@@ -1360,39 +1402,39 @@ Output only natural spoken text. No stage directions, no brackets, no role label
 
         <div className="history-filters" style={{ padding: '16px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div className="search-box" style={{ position: 'relative' }}>
-             <i className="ph ph-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}></i>
-             <input 
-               type="text" 
-               className="form-input" 
-               title="Search conversation"
-               placeholder="Search conversation..." 
-               style={{ paddingLeft: '40px' }}
-               value={historySearch}
-               onChange={(e) => setHistorySearch(e.target.value)}
-             />
+            <i className="ph ph-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}></i>
+            <input
+              type="text"
+              className="form-input"
+              title="Search conversation"
+              placeholder="Search conversation..."
+              style={{ paddingLeft: '40px' }}
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+            />
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-             <select className="form-input" title="Filter by role" style={{ width: 'auto', flex: 1, height: '40px' }} value={historyRoleFilter} onChange={(e) => setHistoryRoleFilter(e.target.value as any)}>
-               <option value="all">Every Role</option>
-               <option value="user">User Only</option>
-               <option value="agent">Agent Only</option>
-               <option value="system">Tools Only</option>
-             </select>
-             <select className="form-input" title="Filter by date" style={{ width: 'auto', flex: 1, height: '40px' }} value={historyDateRange} onChange={(e) => setHistoryDateRange(e.target.value as any)}>
-               <option value="all">All Sessions</option>
-               <option value="today">Today</option>
-               <option value="week">This Week</option>
-             </select>
+            <select className="form-input" title="Filter by role" style={{ width: 'auto', flex: 1, height: '40px' }} value={historyRoleFilter} onChange={(e) => setHistoryRoleFilter(e.target.value as any)}>
+              <option value="all">Every Role</option>
+              <option value="user">User Only</option>
+              <option value="agent">Agent Only</option>
+              <option value="system">Tools Only</option>
+            </select>
+            <select className="form-input" title="Filter by date" style={{ width: 'auto', flex: 1, height: '40px' }} value={historyDateRange} onChange={(e) => setHistoryDateRange(e.target.value as any)}>
+              <option value="all">All Sessions</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+            </select>
           </div>
           {historyRoleFilter === 'system' && (
             <div className="tool-chips" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
               {['search', 'save_memory', 'meeting', 'artifact', 'command'].map(tool => (
-                <button 
-                  key={tool} 
-                  className="pill-btn" 
-                  style={{ 
-                    fontSize: '10px', 
-                    padding: '4px 8px', 
+                <button
+                  key={tool}
+                  className="pill-btn"
+                  style={{
+                    fontSize: '10px',
+                    padding: '4px 8px',
                     backgroundColor: historyToolFilter === tool ? 'var(--accent-active)' : 'transparent',
                     color: historyToolFilter === tool ? 'var(--bg-main)' : 'var(--text-muted)',
                     border: '1px solid var(--border-color)'
@@ -1418,8 +1460,8 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             allHistory
               .filter(t => {
                 // Search filter
-                  const matchesSearch = (t.text || t.content || '').toLowerCase().includes(historySearch.toLowerCase());
-                
+                const matchesSearch = (t.text || t.content || '').toLowerCase().includes(historySearch.toLowerCase());
+
                 // Role filter
                 let matchesRole = true;
                 if (historyRoleFilter !== 'all') {
@@ -1449,36 +1491,36 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                 return matchesSearch && matchesRole && matchesTool && matchesDate;
               })
               .map((turn, idx) => (
-              <div 
-                key={idx} 
-                className={`history-item ${turn.role}`} 
-                style={{ 
-                  padding: '16px', 
-                  borderRadius: '12px', 
-                  backgroundColor: turn.role === 'user' ? 'rgba(203,251,69,0.05)' : turn.role === 'system' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${turn.role === 'user' ? 'rgba(203,251,69,0.1)' : 'rgba(255,255,255,0.05)'}`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ 
-                    fontSize: '11px', 
-                    fontWeight: 700, 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '1px',
-                    color: turn.role === 'user' ? 'var(--accent-active)' : 'var(--text-muted)'
-                  }}>
-                    {turn.role === 'user' ? userCallName : turn.role === 'system' ? 'System' : personaName}
-                  </span>
-                  {turn.isFinal && <i className="ph ph-check-circle" style={{ fontSize: '12px', color: 'var(--accent-active)', opacity: 0.5 }}></i>}
+                <div
+                  key={idx}
+                  className={`history-item ${turn.role}`}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    backgroundColor: turn.role === 'user' ? 'rgba(203,251,69,0.05)' : turn.role === 'system' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${turn.role === 'user' ? 'rgba(203,251,69,0.1)' : 'rgba(255,255,255,0.05)'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      color: turn.role === 'user' ? 'var(--accent-active)' : 'var(--text-muted)'
+                    }}>
+                      {turn.role === 'user' ? userCallName : turn.role === 'system' ? 'System' : personaName}
+                    </span>
+                    {turn.isFinal && <i className="ph ph-check-circle" style={{ fontSize: '12px', color: 'var(--accent-active)', opacity: 0.5 }}></i>}
+                  </div>
+                  <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
+                    <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
+                  </div>
                 </div>
-                <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
-                  <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
-                </div>
-              </div>
-            ))
+              ))
           )}
         </div>
       </div>
@@ -1504,12 +1546,12 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <p className="subtitle">{isSignupMode ? 'Create your new account' : 'Welcome back to Eburon'}</p>
 
           <form className="auth-form" onSubmit={handleEmailAuth}>
-            {authError && <div style={{color:'red', marginBottom:'10px', fontSize:'14px'}}>{authError}</div>}
+            {authError && <div style={{ color: 'red', marginBottom: '10px', fontSize: '14px' }}>{authError}</div>}
             {isSignupMode && (
-               <div className="auth-input-wrapper">
-                 <i className="ph ph-user auth-icon-left"></i>
-                 <input type="text" title="Full name" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} />
-               </div>
+              <div className="auth-input-wrapper">
+                <i className="ph ph-user auth-icon-left"></i>
+                <input type="text" title="Full name" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} />
+              </div>
             )}
             <div className="auth-input-wrapper">
               <i className="ph ph-envelope auth-icon-left"></i>
@@ -1520,10 +1562,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               <input type="password" title="Password" placeholder="Password" required value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             {isSignupMode && (
-                <div className="auth-input-wrapper">
-                   <i className="ph ph-lock auth-icon-left"></i>
-                   <input type="password" title="Confirm password" placeholder="Confirm password" />
-                </div>
+              <div className="auth-input-wrapper">
+                <i className="ph ph-lock auth-icon-left"></i>
+                <input type="password" title="Confirm password" placeholder="Confirm password" />
+              </div>
             )}
             <button type="submit" className="auth-submit-btn">{isSignupMode ? 'Sign up' : 'Sign in'}</button>
           </form>
@@ -1536,7 +1578,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           </button>
 
           <div className="permissions-note">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: '#aaa' }}><i className="ph-fill ph-shield-check" style={{color: 'var(--accent-active)'}}></i> Authorization & Capabilities</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: '#aaa' }}><i className="ph-fill ph-shield-check" style={{ color: 'var(--accent-active)' }}></i> Authorization & Capabilities</span>
             <ul style={{ margin: 0, paddingLeft: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <li><strong>Google Workspace:</strong> Full access to Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Tasks, Contacts, Directory, Keep, Google Photos, and Apps Script.</li>
               <li><strong>Live Web Search:</strong> Real-time Google Search access.</li>
@@ -1561,89 +1603,89 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       {/* Memory Confirmation Modal */}
       {pendingMemory && (
         <div className="confirm-modal-overlay" style={{
-           position: 'fixed',
-           top:0, left:0, right:0, bottom:0,
-           backgroundColor: 'rgba(0,0,0,0.85)',
-           zIndex: 2000,
-           display: 'flex',
-           alignItems: 'center',
-           justifyContent: 'center',
-           padding: '20px'
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
         }}>
-           <div className="confirm-modal" style={{
-             backgroundColor: 'var(--bg-card)',
-             width: '100%',
-             maxWidth: '400px',
-             borderRadius: '16px',
-             border: '1px solid var(--border-color)',
-             overflow: 'hidden',
-             boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-             animation: 'slideUp 0.3s ease-out'
-           }}>
-             <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Save to Memory?</h3>
-                <button title="Dismiss memory" onClick={() => setPendingMemory(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ph ph-x"></i></button>
-             </div>
-             <div style={{ padding: '24px' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>Beatrice wants to store a new memory of this insight:</p>
-                <div className="memory-preview-box" style={{ 
-                   padding: '16px', 
-                   borderRadius: '12px', 
-                   background: 'rgba(255,255,255,0.03)', 
-                   fontSize: '14px', 
-                   lineHeight: '1.6',
-                   marginBottom: '24px', 
-                   fontStyle: 'italic', 
-                   borderLeft: '4px solid var(--accent-active)',
-                   color: '#fff',
-                   position: 'relative'
-                }}>
-                   <i className="ph ph-quotes" style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.1, fontSize: '24px' }}></i>
-                   "{pendingMemory.content}"
-                </div>
-                
-                <div className="form-group" style={{ marginBottom: '28px' }}>
-                   <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', display: 'block', color: 'var(--text-muted)' }}>Classify this Memory</label>
-                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                      {['personal', 'work', 'project'].map(cat => (
-                         <button 
-                           key={cat}
-                           className={`cat-btn ${newMemoryType === cat ? 'active' : ''}`}
-                           style={{
-                              padding: '10px',
-                              borderRadius: '8px',
-                              border: `1px solid ${newMemoryType === cat ? 'var(--accent-active)' : 'var(--border-color)'}`,
-                              background: newMemoryType === cat ? 'rgba(203,251,69,0.1)' : 'transparent',
-                              color: newMemoryType === cat ? 'var(--accent-active)' : 'var(--text-muted)',
-                              fontSize: '12px',
-                              textTransform: 'capitalize',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                           }}
-                           onClick={() => setNewMemoryType(cat)}
-                         >
-                           {cat}
-                         </button>
-                      ))}
-                   </div>
-                </div>
+          <div className="confirm-modal" style={{
+            backgroundColor: 'var(--bg-card)',
+            width: '100%',
+            maxWidth: '400px',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color)',
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Save to Memory?</h3>
+              <button title="Dismiss memory" onClick={() => setPendingMemory(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><i className="ph ph-x"></i></button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>Beatrice wants to store a new memory of this insight:</p>
+              <div className="memory-preview-box" style={{
+                padding: '16px',
+                borderRadius: '12px',
+                background: 'rgba(255,255,255,0.03)',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                marginBottom: '24px',
+                fontStyle: 'italic',
+                borderLeft: '4px solid var(--accent-active)',
+                color: '#fff',
+                position: 'relative'
+              }}>
+                <i className="ph ph-quotes" style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.1, fontSize: '24px' }}></i>
+                "{pendingMemory.content}"
+              </div>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                   <button 
-                     className="btn-secondary" 
-                     style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
-                     onClick={() => setPendingMemory(null)}
-                   >Discard</button>
-                   <button 
-                     className="btn-primary" 
-                     style={{ flex: 1, padding: '12px', borderRadius: '12px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)', fontWeight: 600 }}
-                     onClick={() => {
-                        handleConfirmPendingMemory(newMemoryType);
-                     }}
-                   >Save Memory</button>
+              <div className="form-group" style={{ marginBottom: '28px' }}>
+                <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', display: 'block', color: 'var(--text-muted)' }}>Classify this Memory</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {['personal', 'work', 'project'].map(cat => (
+                    <button
+                      key={cat}
+                      className={`cat-btn ${newMemoryType === cat ? 'active' : ''}`}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: `1px solid ${newMemoryType === cat ? 'var(--accent-active)' : 'var(--border-color)'}`,
+                        background: newMemoryType === cat ? 'rgba(203,251,69,0.1)' : 'transparent',
+                        color: newMemoryType === cat ? 'var(--accent-active)' : 'var(--text-muted)',
+                        fontSize: '12px',
+                        textTransform: 'capitalize',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => setNewMemoryType(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
-             </div>
-           </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
+                  onClick={() => setPendingMemory(null)}
+                >Discard</button>
+                <button
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', backgroundColor: 'var(--accent-active)', color: 'var(--bg-main)', fontWeight: 600 }}
+                  onClick={() => {
+                    handleConfirmPendingMemory(newMemoryType);
+                  }}
+                >Save Memory</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
