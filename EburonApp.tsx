@@ -50,7 +50,7 @@ export default function EburonApp() {
 
   useEffect(() => {
     if (bgAudioRef.current) {
-     bgAudioRef.current.volume = 0.15;
+    bgAudioRef.current.volume = 0.45;
       if (connected) {
         bgAudioRef.current.play().catch(err => console.log("Bg audio play blocked until interaction:", err));
       } else {
@@ -624,6 +624,14 @@ IMPORTANT: When generating documents or artifacts, ALWAYS verbalize that you are
 - Use "generate_artifact" when asked to create a document, write a report, generate code, or produce a structured output.
 - Use "execute_voice_command" for safe system operations.
 - Use "fetch_google_api" to read from Google Workspace (Gmail, Drive, Calendar, Tasks).
+- Google Maps Tools: Use "geocode_address" to convert addresses to coordinates, "get_directions" for driving/walking/transit directions, and "search_places" to find nearby restaurants, landmarks, etc.
+- Google Drive Tools: Use "list_drive_files" to browse Drive, "get_drive_file" to inspect a specific file's metadata.
+- Google Docs & Sheets: Use "create_document" to create a new Google Doc with content, "create_sheet" to create a new Google Sheet.
+- Google Chat: Use "list_chat_spaces" to see your Chat spaces, "send_chat_message" to post a message in a space.
+- YouTube: Use "search_youtube" to find videos by keyword.
+- Google Calendar: Use "list_calendar_events" to see upcoming events, "create_calendar_event" to add new events.
+- Gmail: Use "list_gmail_messages" and "get_gmail_message" to read emails, "send_email" to compose and send.
+- Google Contacts: Use "search_contacts" or "list_contacts" to look up people in your address book.
 - Use "run_vps_command" for VPS sandbox terminal checks and safe remote commands.
 - Use "ask_vps_ollama" to ask self-hosted or VPS cloud Ollama models for analysis or generation.
 - Use "run_hermes_agent" to route a task through the Hermes Agent CLI on the VPS.

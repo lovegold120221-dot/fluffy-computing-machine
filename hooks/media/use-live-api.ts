@@ -386,25 +386,229 @@ export function useLiveApi({
           }
         }
 
-        if (fc.name === 'list_contacts') {
-          const { pageSize } = fc.args as any;
-          const token = useAuth.getState().googleAccessToken;
-          if (!token) {
-            responsePayload = { error: 'No Google access token found.' };
-          } else {
-            try {
-              const url = new URL('https://people.googleapis.com/v1/people/me/connections');
-              url.searchParams.append('personFields', 'names,emailAddresses,phoneNumbers');
-              url.searchParams.append('pageSize', (pageSize || 10).toString());
-              const res = await fetch(url.toString(), {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              responsePayload = await res.json();
-            } catch (e: any) {
-              responsePayload = { error: e.message };
+          if (fc.name === 'list_contacts') {
+            const { pageSize } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const url = new URL('https://people.googleapis.com/v1/people/me/connections');
+                url.searchParams.append('personFields', 'names,emailAddresses,phoneNumbers');
+                url.searchParams.append('pageSize', (pageSize || 10).toString());
+                const res = await fetch(url.toString(), {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
             }
           }
-        }
+
+          if (fc.name === 'search_youtube') {
+            const { q, maxResults } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const url = new URL('https://youtube.googleapis.com/youtube/v3/search');
+                url.searchParams.append('part', 'snippet');
+                url.searchParams.append('q', q);
+                if (maxResults) url.searchParams.append('maxResults', maxResults.toString());
+                url.searchParams.append('type', 'video');
+                const res = await fetch(url.toString(), {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'geocode_address') {
+            const { address } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+                url.searchParams.append('address', address);
+                const res = await fetch(url.toString(), {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'get_directions') {
+            const { origin, destination, mode } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
+                url.searchParams.append('origin', origin);
+                url.searchParams.append('destination', destination);
+                if (mode) url.searchParams.append('mode', mode);
+                const res = await fetch(url.toString(), {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'list_drive_files') {
+            const { q, pageSize } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const url = new URL('https://www.googleapis.com/drive/v3/files');
+                if (q) url.searchParams.append('q', q);
+                if (pageSize) url.searchParams.append('pageSize', pageSize.toString());
+                url.searchParams.append('supportsAllDrives', 'true');
+                const res = await fetch(url.toString(), {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'get_drive_file') {
+            const { fileId } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true&fields=id,name,mimeType,webViewLink,size,createdTime,modifiedTime`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'create_document') {
+            const { title, content } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const res = await fetch('https://docs.googleapis.com/v1/documents', {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    title: title,
+                  }),
+                });
+                const doc = await res.json();
+                if (content && doc.documentId) {
+                  await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`, {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      requests: [{
+                        insertText: {
+                          location: { index: 1 },
+                          text: content
+                        }
+                      }]
+                    }),
+                  });
+                }
+                responsePayload = doc;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'create_sheet') {
+            const { title, headers, rows } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    properties: { title },
+                  }),
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'send_chat_message') {
+            const { spaceName, text } = fc.args as any;
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const res = await fetch(`https://chat.googleapis.com/v1/${spaceName}/messages`, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ text }),
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'list_chat_spaces') {
+            const token = useAuth.getState().googleAccessToken;
+            if (!token) {
+              responsePayload = { error: 'No Google access token found.' };
+            } else {
+              try {
+                const res = await fetch('https://chat.googleapis.com/v1/spaces', {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
 
         // Prepare the response
         functionResponses.push({

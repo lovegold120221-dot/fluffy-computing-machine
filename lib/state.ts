@@ -308,7 +308,128 @@ export const workspaceTools: FunctionCall[] = [
       type: "OBJECT",
       properties: {}
     }
-  }
+  },
+  {
+    name: "search_youtube",
+    description: "Search YouTube videos by query. Returns video ID, title, description, and channel info.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        q: { type: "STRING", description: "Search query." },
+        maxResults: { type: "NUMBER", description: "Maximum results to return (default 10)." }
+      },
+      required: ["q"]
+    }
+  },
+  {
+    name: "geocode_address",
+    description: "Convert a street address into geographic coordinates (latitude, longitude) using the Google Geocoding API.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        address: { type: "STRING", description: "Street address to geocode." }
+      },
+      required: ["address"]
+    }
+  },
+  {
+    name: "get_directions",
+    description: "Get driving, walking, bicycling, or transit directions between two points using the Google Directions API.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        origin: { type: "STRING", description: "Starting address or lat,lng." },
+        destination: { type: "STRING", description: "Destination address or lat,lng." },
+        mode: { type: "STRING", description: "Travel mode: driving, walking, bicycling, transit." }
+      },
+      required: ["origin", "destination"]
+    }
+  },
+  {
+    name: "list_drive_files",
+    description: "Lists files and folders from Google Drive. Supports query filtering.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        q: { type: "STRING", description: "Drive API query string, e.g. \"name contains 'report'\"." },
+        pageSize: { type: "NUMBER", description: "Number of results per page (default 20)." }
+      }
+    }
+  },
+  {
+    name: "get_drive_file",
+    description: "Get metadata and download link for a specific Google Drive file by ID.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        fileId: { type: "STRING", description: "The Drive file ID." }
+      },
+      required: ["fileId"]
+    }
+  },
+  {
+    name: "create_document",
+    description: "Create a new Google Doc with content. Returns the document ID and URL.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        title: { type: "STRING", description: "Document title." },
+        content: { type: "STRING", description: "Initial content of the document." }
+      },
+      required: ["title"]
+    }
+  },
+  {
+    name: "create_sheet",
+    description: "Create a new Google Sheet with initial data.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        title: { type: "STRING", description: "Sheet title." },
+        headers: { type: "STRING", description: "Comma-separated column headers." },
+        rows: { type: "STRING", description: "Tab-separated rows (each row newline-separated, cells tab-separated)." }
+      },
+      required: ["title"]
+    }
+  },
+  {
+    name: "send_chat_message",
+    description: "Send a message to a Google Chat space.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        spaceName: { type: "STRING", description: "Chat space name (e.g. 'spaces/AAAA...')." },
+        text: { type: "STRING", description: "Message text to send." }
+      },
+      required: ["spaceName", "text"]
+    }
+  },
+  {
+    name: "list_chat_spaces",
+    description: "List Google Chat spaces the user is a member of.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {}
+    }
+  },
 ];
 
 export type Template = 'customer-support' | 'personal-assistant' | 'navigation-system';
