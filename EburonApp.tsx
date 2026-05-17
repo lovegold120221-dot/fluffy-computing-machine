@@ -993,7 +993,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         { functionDeclarations: [{ name: 'send_whatsapp_message', description: 'Send a WhatsApp message to a phone number. Use when the Boss asks to WhatsApp someone.', parameters: { type: 'object', properties: { number: { type: 'string', description: 'Phone number with country code, e.g. 31612345678' }, text: { type: 'string', description: 'Message text to send' } }, required: ['number', 'text'] } }] }
       ]
     } as any);
-  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile, kbFiles]);
+  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile, kbFiles, whatsappContacts]);
 
   useEffect(() => {
     let interval: any;
