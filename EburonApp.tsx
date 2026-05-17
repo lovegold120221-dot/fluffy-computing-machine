@@ -820,35 +820,37 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <span className="ai-name">Eburon AI</span>
         </div>
 
-        {connected && (
-          <div className="timer-with-vis" style={{
-            color: timerSeconds >= 1140 ? '#ff8888' : 'var(--text-muted)',
-          }}>
-            {[...Array(6)].map((_, i) => (
-              <div key={`l-${i}`} className="timer-vis-bar" style={{
-                height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
-                opacity: 0.4 + (volume * 0.6),
-              }} />
-            ))}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', fontFamily: 'monospace', fontWeight: 600,
-              padding: '2px 10px', borderRadius: '12px',
-              backgroundColor: 'rgba(0,0,0,0.2)',
-              border: `1px solid ${timerSeconds >= 1140 ? 'rgba(255,0,0,0.2)' : 'var(--border-color)'}`,
+        <div className="header-center">
+          {connected && (
+            <div className="timer-with-vis" style={{
+              color: timerSeconds >= 1140 ? '#ff8888' : 'var(--text-muted)',
             }}>
-              <i className={`ph-fill ph-clock${timerSeconds >= 1140 ? '-countdown' : ''}`} style={{ color: timerSeconds >= 1140 ? '#ff4d4d' : 'var(--accent-active)' }}></i>
-              {Math.floor(timerSeconds / 60)}:{String(timerSeconds % 60).padStart(2, '0')}
-              {timerSeconds >= 1140 && <span style={{ marginLeft: '4px', fontSize: '10px', textTransform: 'uppercase' }}>Limiting...</span>}
+              {[...Array(6)].map((_, i) => (
+                <div key={`l-${i}`} className="timer-vis-bar" style={{
+                  height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
+                  opacity: 0.4 + (volume * 0.6),
+                }} />
+              ))}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                fontSize: '12px', fontFamily: 'monospace', fontWeight: 600,
+                padding: '2px 10px', borderRadius: '12px',
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                border: `1px solid ${timerSeconds >= 1140 ? 'rgba(255,0,0,0.2)' : 'var(--border-color)'}`,
+              }}>
+                <i className={`ph-fill ph-clock${timerSeconds >= 1140 ? '-countdown' : ''}`} style={{ color: timerSeconds >= 1140 ? '#ff4d4d' : 'var(--accent-active)' }}></i>
+                {Math.floor(timerSeconds / 60)}:{String(timerSeconds % 60).padStart(2, '0')}
+                {timerSeconds >= 1140 && <span style={{ marginLeft: '4px', fontSize: '10px', textTransform: 'uppercase' }}>Limiting...</span>}
+              </div>
+              {[...Array(6)].map((_, i) => (
+                <div key={`r-${i}`} className="timer-vis-bar" style={{
+                  height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
+                  opacity: 0.4 + (volume * 0.6),
+                }} />
+              ))}
             </div>
-            {[...Array(6)].map((_, i) => (
-              <div key={`r-${i}`} className="timer-vis-bar" style={{
-                height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
-                opacity: 0.4 + (volume * 0.6),
-              }} />
-            ))}
-          </div>
-        )}
+          )}
+        </div>
 
         {memorySuccessMsg && (
           <div className="memory-toast" style={{

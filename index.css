@@ -51,22 +51,27 @@
     .header {
       position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center;
       padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+      gap: 8px;
     }
     .header-left {
       display: flex; align-items: center; background-color: var(--bg-chip);
       padding: 8px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;
+      flex-shrink: 0;
+    }
+    .header-left .ai-name { display: none; }
+    @media (min-width: 480px) { .header-left .ai-name { display: inline; } }
+
+    .header-center {
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; min-width: 0; overflow: hidden;
     }
 
-    .header-right { display: flex; align-items: center; gap: 8px; }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     
     .timer-with-vis {
-      position: absolute;
-      left: 50%;
-      top: 28px;
-      transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .timer-vis-bar {
       width: 4px;
