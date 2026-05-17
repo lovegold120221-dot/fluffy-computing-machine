@@ -55,10 +55,11 @@
     }
     .header-left {
       display: flex; align-items: center; gap: 8px;
+      background-color: var(--bg-chip); padding: 0 16px; border-radius: 20px;
       flex-shrink: 0; height: 40px;
     }
-    .logo-icon img { height: 22px; display: block; }
-    .header-left .ai-name { display: none; font-size: 14px; font-weight: 600; }
+    .logo-icon img { height: 20px; display: block; }
+    .header-left .ai-name { font-size: 14px; font-weight: 600; display: none; }
     @media (min-width: 480px) { .header-left .ai-name { display: inline; } }
 
     .header-center {
