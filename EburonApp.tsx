@@ -317,8 +317,8 @@ export default function EburonApp() {
         currentAgentText.current = "";
       }
 
-      // Accumulate text for the current user turn
-      currentUserText.current += text;
+      // Accumulate text for the current user turn (Gemini fires full transcript each time)
+      currentUserText.current = text;
       const fullText = currentUserText.current;
 
       // Check again after potential finalization
@@ -353,8 +353,8 @@ export default function EburonApp() {
         currentUserText.current = "";
       }
 
-      // Accumulate text for the current agent turn
-      currentAgentText.current += text;
+      // Accumulate text for the current agent turn (Gemini fires full transcript each time)
+      currentAgentText.current = text;
       const fullText = currentAgentText.current;
 
       const updatedTurns = useLogStore.getState().turns;
@@ -591,6 +591,115 @@ export default function EburonApp() {
               return { id: fc.id, response: { runs: result } };
             } catch (err: any) {
               return { id: fc.id, response: { runs: [], error: err.message || String(err) } };
+            }
+          }
+
+          // ── WhatsApp Tool Handlers ──
+
+          if (fc.name === 'send_whatsapp_message') {
+            try {
+              const phoneNumber = fc.args.phoneNumber || fc.args.number;
+              const message = fc.args.message || fc.args.text;
+              if (!phoneNumber || !message) {
+                return { id: fc.id, response: { error: "Phone number and message text are required." } };
+              }
+              const result = await api.sendWhatsAppMessage(phoneNumber, message);
+              return { id: fc.id, response: { success: true, status: "Message sent successfully.", result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'send_voice_message') {
+            try {
+              const phoneNumber = fc.args.phoneNumber;
+              const audioBase64 = fc.args.audioBase64;
+              const caption = fc.args.caption;
+              if (!phoneNumber || !audioBase64) {
+                return { id: fc.id, response: { error: "Phone number and audio are required." } };
+              }
+              const result = await api.sendWhatsAppVoiceMessage(phoneNumber, audioBase64, caption);
+              return { id: fc.id, response: { success: true, status: "Voice message sent.", result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'search_whatsapp_messages') {
+            try {
+              const phoneNumber = fc.args.phoneNumber;
+              if (!phoneNumber) {
+                return { id: fc.id, response: { error: "Phone number is required." } };
+              }
+              const result = await api.searchWhatsAppMessages(phoneNumber, fc.args.query, fc.args.limit || 20);
+              const summary = result.messages.length > 0
+                ? `Found ${result.count} messages. Recent: ${result.messages.slice(0, 5).map((m: any) => JSON.stringify(m.message || m).slice(0, 100)).join(' | ')}`
+                : `No messages found for ${phoneNumber}.`;
+              return { id: fc.id, response: { success: true, summary, messages: result.messages.slice(0, 10), count: result.count } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'read_whatsapp_chat') {
+            try {
+              const phoneNumber = fc.args.phoneNumber;
+              if (!phoneNumber) {
+                return { id: fc.id, response: { error: "Phone number is required." } };
+              }
+              const result = await api.readWhatsAppChat(phoneNumber, fc.args.limit || 30);
+              const summary = result.messages.length > 0
+                ? `Retrieved ${result.messages.length} messages from chat with ${phoneNumber}.`
+                : `No chat history found for ${phoneNumber}.`;
+              return { id: fc.id, response: { success: true, summary, messages: result.messages.slice(0, 15), count: result.messages.length } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_status') {
+            try {
+              const result = await api.getWhatsAppInstanceStatus();
+              return { id: fc.id, response: { success: true, ...result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_phonebook') {
+            try {
+              const result = await api.fetchWhatsAppPhonebook();
+              const summary = result.contacts.length > 0
+                ? `Found ${result.count} contacts. First few: ${result.contacts.slice(0, 5).map((c: any) => `${c.name || c.pushname || 'Unknown'} (${c.phoneNumber})`).join(', ')}`
+                : 'No contacts found.';
+              return { id: fc.id, response: { success: true, summary, contacts: result.contacts.slice(0, 20), count: result.count } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_contacts') {
+            try {
+              const result = await api.getWhatsAppContacts(fc.args.limit || 50);
+              const summary = result.contacts.length > 0
+                ? `Found ${result.count} contacts.`
+                : 'No contacts found.';
+              return { id: fc.id, response: { success: true, summary, contacts: result.contacts.slice(0, 20), count: result.count } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'initiate_whatsapp_call') {
+            try {
+              const phoneNumber = fc.args.phoneNumber;
+              if (!phoneNumber) {
+                return { id: fc.id, response: { error: "Phone number is required." } };
+              }
+              const result = await api.initiateWhatsAppCall(phoneNumber, fc.args.callType || 'voice');
+              return { id: fc.id, response: { success: true, status: "Call initiated.", result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
             }
           }
 
@@ -991,7 +1100,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         'drive': 'Find the latest project files in my Google Drive.',
         'google': 'Run a quick Google search on recent tech news.',
         'signature': 'Prepare a non-disclosure agreement for signature.',
-        'company': 'Look up the company registration details for Ariolas BV.',
+        'lookup': 'Look up the company registration details for Ariolas BV.',
         'proposal': 'Draft a business proposal for a new client.',
         'gmail': 'Check my inbox for unread emails from the team.',
         'sheets': 'Create a new expense tracking spreadsheet.',
@@ -1143,7 +1252,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <div className="skill-chip" onClick={() => handleToolAction('drive')}><div className="skill-glyph bg-drive"><i className="ph-duotone ph-folder-open"></i></div><span className="skill-label">Drive</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('google')}><div className="skill-glyph bg-google"><i className="ph-fill ph-google-logo"></i></div><span className="skill-label">Google</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('signature')}><div className="skill-glyph bg-signature"><i className="ph-duotone ph-signature"></i></div><span className="skill-label">Sign</span></div>
-            <div className="skill-chip" onClick={() => handleToolAction('company')}><div className="skill-glyph bg-company"><i className="ph-duotone ph-buildings"></i></div><span className="skill-label">Company</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('lookup')}><div className="skill-glyph bg-company"><i className="ph-duotone ph-buildings"></i></div><span className="skill-label">LookUp</span></div>
           </div>
         </div>
         <div className="skills-row" data-row="2">
@@ -1152,12 +1261,18 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <div className="skill-chip" onClick={() => handleToolAction('whatsapp')}><div className="skill-glyph bg-whatsapp"><i className="ph-duotone ph-whatsapp-logo"></i></div><span className="skill-label">WhatsApp</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('tools')}><div className="skill-glyph bg-tools"><i className="ph-duotone ph-wrench"></i></div><span className="skill-label">Tools</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('automation')}><div className="skill-glyph" style={{ background: 'rgba(203,251,69,0.12)' }}><i className="ph-duotone ph-robot" style={{ color: 'var(--accent-active)' }}></i></div><span className="skill-label">Automation</span></div>
-
             <div className="skill-chip" onClick={() => handleToolAction('history')}><div className="skill-glyph bg-history"><i className="ph-duotone ph-clock-counter-clockwise"></i></div><span className="skill-label">History</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('proposal')}><div className="skill-glyph bg-proposal"><i className="ph-duotone ph-presentation-chart"></i></div><span className="skill-label">Proposal</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('gmail')}><div className="skill-glyph bg-gmail"><i className="ph-duotone ph-envelope-simple"></i></div><span className="skill-label">Mail</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('sheets')}><div className="skill-glyph bg-sheets"><i className="ph-duotone ph-table"></i></div><span className="skill-label">Sheets</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('slides')}><div className="skill-glyph bg-slides"><i className="ph-duotone ph-presentation-chart"></i></div><span className="skill-label">Slides</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('youtube')}><div className="skill-glyph bg-youtube"><i className="ph-duotone ph-youtube-logo"></i></div><span className="skill-label">YouTube</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('music')}><div className="skill-glyph bg-music"><i className="ph-duotone ph-music-notes"></i></div><span className="skill-label">Music</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('images')}><div className="skill-glyph bg-images"><i className="ph-duotone ph-image"></i></div><span className="skill-label">Images</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('video')}><div className="skill-glyph bg-video"><i className="ph-duotone ph-video-camera"></i></div><span className="skill-label">Video</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('documents')}><div className="skill-glyph bg-documents"><i className="ph-duotone ph-file-text"></i></div><span className="skill-label">Docs</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('location')}><div className="skill-glyph bg-location"><i className="ph-duotone ph-map-pin"></i></div><span className="skill-label">Location</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('places')}><div className="skill-glyph bg-places"><i className="ph-duotone ph-map-trifold"></i></div><span className="skill-label">Places</span></div>
           </div>
         </div>
       </div>

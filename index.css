@@ -128,6 +128,13 @@
     .bg-sheets { background: #28ca63; }
     .bg-slides { background: #fca727; }
     .bg-whatsapp { background: #25D366; }
+    .bg-youtube { background: #FF0000; }
+    .bg-music { background: linear-gradient(135deg, #ec4899, #a855f7); }
+    .bg-images { background: linear-gradient(135deg, #14b8a6, #06b6d4); }
+    .bg-video { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    .bg-documents { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .bg-location { background: linear-gradient(135deg, #3b82f6, #4f46e5); }
+    .bg-places { background: linear-gradient(135deg, #10b981, #059669); }
 
     /* ---------------------------------------------------
        5. Chat Stream

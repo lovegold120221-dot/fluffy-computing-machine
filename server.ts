@@ -40,6 +40,15 @@ import {
   deleteInstance,
   normalizeEvolutionState,
   verifyWebhookSecret,
+  searchWhatsAppMessages,
+  readWhatsAppChat,
+  getWhatsAppContacts,
+  getWhatsAppStatus,
+  fetchWhatsAppPhonebook,
+  getInstanceDetails,
+  sendVoiceMessage,
+  initiateWhatsAppCall,
+  sendVoiceNote,
 } from "./lib/server/evolution-client";
 
 dotenv.config();
@@ -1167,6 +1176,270 @@ async function startServer() {
     }
   });
 
+  // ── WhatsApp Tool API Handlers ──
+  app.post("/api/whatsapp/search", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const { phoneNumber, query, limit = 20 } = req.body;
+      if (!phoneNumber) {
+        return jsonError(res, 400, "MISSING_PHONE_NUMBER", "Phone number required.");
+      }
+
+      const result = await searchWhatsAppMessages(conn.instance_name, phoneNumber, query, limit);
+      res.json({ success: true, ...result, instanceName: conn.instance_name });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/search:", err.message);
+      jsonError(res, 500, "WHATSAPP_SEARCH_ERROR", err.message);
+    }
+  });
+
+  app.post("/api/whatsapp/read", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const { phoneNumber, limit = 30 } = req.body;
+      if (!phoneNumber) {
+        return jsonError(res, 400, "MISSING_PHONE_NUMBER", "Phone number required.");
+      }
+
+      const result = await readWhatsAppChat(conn.instance_name, phoneNumber, limit);
+      res.json({ success: true, ...result, instanceName: conn.instance_name });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/read:", err.message);
+      jsonError(res, 500, "WHATSAPP_READ_ERROR", err.message);
+    }
+  });
+
+  app.post("/api/whatsapp/instance-status", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return res.json({ success: true, connected: false, instanceName: null });
+      }
+
+      const details = await getInstanceDetails(conn.instance_name);
+      res.json({ success: true, ...details });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/instance-status:", err.message);
+      jsonError(res, 500, "WHATSAPP_STATUS_ERROR", err.message);
+    }
+  });
+
+  app.post("/api/whatsapp/contacts", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const { limit = 50 } = req.body;
+      const result = await getWhatsAppContacts(conn.instance_name, limit);
+      res.json({ success: true, ...result, instanceName: conn.instance_name });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/contacts:", err.message);
+      jsonError(res, 500, "WHATSAPP_CONTACTS_ERROR", err.message);
+    }
+  });
+
+  // ── WhatsApp Activity Logging ──
+  app.post("/api/whatsapp/activities", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+
+      const { limit = 50, type, direction } = req.body;
+
+      let query = supabase?.from("whatsapp_activities").select("*").eq("user_id", uid);
+      if (type) query = query?.eq("activity_type", type);
+      if (direction) query = query?.eq("direction", direction);
+      query = query?.order("created_at", { ascending: false }).limit(limit);
+
+      const { data, error } = await query || { data: [], error: null };
+
+      if (error && !String(error).includes("does not exist")) {
+        console.error("Get activities error:", error);
+      }
+
+      res.json({
+        success: true,
+        activities: data || [],
+        count: (data || []).length,
+      });
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/activities:", err.message);
+      jsonError(res, 500, "ACTIVITIES_ERROR", err.message);
+    }
+  });
+
+  // ── WhatsApp Phonebook (GET) ──
+  app.get("/api/whatsapp/phonebook", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (!conn || !conn.instance_name) {
+        return res.json({
+          success: true,
+          contacts: [],
+          count: 0,
+          instanceName: null,
+        });
+      }
+
+      const result = await fetchWhatsAppPhonebook(conn.instance_name, 200);
+      
+      // Log this as a Gemini Live audio action
+      if (supabase) {
+        await supabase.from("whatsapp_activities").insert({
+          user_id: uid,
+          instance_name: conn.instance_name,
+          activity_type: "get_phonebook",
+          direction: "inbound",
+          status: "success",
+          source: "gemini_live_audio",
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      res.json({
+        success: true,
+        ...result,
+        instanceName: conn.instance_name,
+      });
+    } catch (err: any) {
+      console.error("GET /api/whatsapp/phonebook:", err.message);
+      jsonError(res, 500, "PHONEBOOK_ERROR", err.message);
+    }
+  });
+
+  // ── Cartesia Voice Generation ──
+  app.post("/api/cartesia/generate-voice", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      
+      const { text, voiceCloneId, duration } = req.body;
+      
+      if (!text) {
+        return jsonError(res, 400, "MISSING_TEXT", "Text required for voice generation.");
+      }
+
+      // Generate audio via Cartesia API
+      const cartesiaApiKey = process.env.CARTESIA_API_KEY;
+      if (!cartesiaApiKey) {
+        return jsonError(res, 500, "CARTESIA_NOT_CONFIGURED", "Cartesia API key not configured.");
+      }
+
+      const voiceId = voiceCloneId || process.env.DEFAULT_VOICE_ID || "7c0b2e18-6f6e-4d86-a0a8-0e1c3e0e0e0e";
+      
+      const response = await fetch("https://api.cartesia.ai/tts/bytes", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${cartesiaApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model_id: "tts-1-8k",
+          transcript: text,
+          voice: {
+            voice_id: voiceId,
+            mode: "SANDBOX", // or use specific voice_clone_id
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return jsonError(res, 500, "CARTESIA_ERROR", errText);
+      }
+
+      // Get audio as ArrayBuffer then convert to base64
+      const audioBuffer = await response.arrayBuffer();
+      const base64Audio = Buffer.from(audioBuffer).toString("base64");
+
+      // Log activity
+      if (supabase) {
+        await supabase.from("whatsapp_activities").insert({
+          user_id: uid,
+          activity_type: "generate_voice",
+          direction: "outbound",
+          content: text,
+          status: "success",
+          source: "gemini_live_audio",
+          metadata: { voiceId, duration },
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      res.json({
+        success: true,
+        audioBase64: base64Audio,
+        voiceId,
+        format: "pcm",
+        sampleRate: 8000,
+      });
+    } catch (err: any) {
+      console.error("POST /api/cartesia/generate-voice:", err.message);
+      jsonError(res, 500, "VOICE_GENERATION_ERROR", err.message);
+    }
+  });
+
   // ── Evolution Webhook Receiver ──
   app.post("/webhooks/evolution", async (req, res) => {
     try {
@@ -1246,6 +1519,95 @@ async function startServer() {
     } catch (err: any) {
       console.error("Webhook error:", err.message);
       res.status(200).json({ received: true }); // Always 200 to avoid retries
+    }
+  });
+
+  // ── WhatsApp Voice Message & Call Routes ──
+  app.post("/api/whatsapp/send-voice", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .eq("status", "connected")
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const { phoneNumber, audioBase64, caption } = req.body;
+      if (!phoneNumber || !audioBase64) {
+        return jsonError(res, 400, "MISSING_PARAMETERS", "Phone number and audio required.");
+      }
+
+      const result = await sendVoiceMessage(conn.instance_name, phoneNumber, audioBase64, caption);
+
+      await supabase.from("whatsapp_activities").insert({
+        user_id: uid,
+        instance_name: conn.instance_name,
+        activity_type: "send_voice_message",
+        direction: "outbound",
+        phone_number: phoneNumber,
+        content: caption || "Voice message",
+        status: "sent",
+        source: "gemini_live_audio",
+        created_at: new Date().toISOString(),
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/send-voice:", err.message);
+      jsonError(res, 500, "VOICE_SEND_ERROR", err.message);
+    }
+  });
+
+  app.post("/api/whatsapp/initiate-call", authenticateToken, async (req: any, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
+      const db = requireSupabase(res);
+      if (!db) return;
+
+      const { data: conn } = await db
+        .from("whatsapp_connections")
+        .select("instance_name")
+        .eq("user_id", uid)
+        .eq("status", "connected")
+        .maybeSingle();
+
+      if (!conn) {
+        return jsonError(res, 400, "NOT_CONNECTED", "WhatsApp is not connected.");
+      }
+
+      const { phoneNumber, callType = 'voice' } = req.body;
+      if (!phoneNumber) {
+        return jsonError(res, 400, "MISSING_PHONE_NUMBER", "Phone number required.");
+      }
+
+      const result = await initiateWhatsAppCall(conn.instance_name, phoneNumber, callType);
+
+      await supabase.from("whatsapp_activities").insert({
+        user_id: uid,
+        instance_name: conn.instance_name,
+        activity_type: `initiate_${callType}_call`,
+        direction: "outbound",
+        phone_number: phoneNumber,
+        status: "initiated",
+        source: "gemini_live_audio",
+        metadata: { callType },
+        created_at: new Date().toISOString(),
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/whatsapp/initiate-call:", err.message);
+      jsonError(res, 500, "CALL_INITIATE_ERROR", err.message);
     }
   });
 

@@ -393,3 +393,203 @@ export async function disconnectWhatsApp() {
   if (!res.ok) throw new Error(await readApiError(res, "Failed to disconnect WhatsApp"));
   return res.json();
 }
+
+// ── WhatsApp Phonebook API ──
+
+export async function fetchWhatsAppPhonebook(): Promise<{
+  success: boolean;
+  contacts: { id: string; phoneNumber: string; name: string; pushname?: string }[];
+  count: number;
+  instanceName: string | null;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/phonebook", { headers });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to fetch WhatsApp phonebook"));
+  }
+  return res.json();
+}
+
+// ── WhatsApp Activities API ──
+
+export type WhatsAppActivity = {
+  id: number;
+  user_id: string;
+  instance_name: string;
+  activity_type: string;
+  direction: string;
+  phone_number?: string;
+  content?: string;
+  status: string;
+  source?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+};
+
+export async function fetchWhatsAppActivities(options: {
+  limit?: number;
+  type?: string;
+  direction?: string;
+} = {}): Promise<{
+  success: boolean;
+  activities: WhatsAppActivity[];
+  count: number;
+}> {
+  const headers = await getHeaders();
+  const params = new URLSearchParams();
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.type) params.set("type", options.type);
+  if (options.direction) params.set("direction", options.direction);
+  
+  const res = await fetch(`/api/whatsapp/activities?${params.toString()}`, { headers });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to fetch WhatsApp activities"));
+  }
+  return res.json();
+}
+
+// ── Cartesia Voice API ──
+
+export async function generateCartesiaVoice(
+  text: string,
+  voiceCloneId?: string
+): Promise<{
+  success: boolean;
+  audioBase64: string;
+  voiceId: string;
+  format: string;
+  sampleRate: number;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/cartesia/generate-voice", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ text, voiceCloneId }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to generate Cartesia voice"));
+  }
+  return res.json();
+}
+
+// ── WhatsApp Voice Message API ──
+
+export async function sendWhatsAppVoiceMessage(
+  phoneNumber: string,
+  audioBase64: string,
+  caption?: string,
+  instanceName: string = 'beatrice'
+): Promise<any> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/send-voice", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phoneNumber, audioBase64, caption, instanceName }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to send WhatsApp voice message"));
+  }
+  return res.json();
+}
+
+// ── WhatsApp Call API ──
+
+export async function initiateWhatsAppCall(
+  phoneNumber: string,
+  callType: 'voice' | 'video' = 'voice',
+  instanceName: string = 'beatrice'
+): Promise<any> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/initiate-call", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phoneNumber, callType, instanceName }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to initiate WhatsApp call"));
+  }
+  return res.json();
+}
+
+// ── WhatsApp Tool API (for Gemini Live audio function calling) ──
+
+export async function searchWhatsAppMessages(
+  phoneNumber: string,
+  query?: string,
+  limit: number = 20
+): Promise<{
+  success: boolean;
+  messages: any[];
+  count: number;
+  instanceName: string | null;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/search", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phoneNumber, query, limit }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to search WhatsApp messages"));
+  }
+  return res.json();
+}
+
+export async function readWhatsAppChat(
+  phoneNumber: string,
+  limit: number = 30
+): Promise<{
+  success: boolean;
+  messages: any[];
+  contactId: string;
+  instanceName: string | null;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/read", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phoneNumber, limit }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to read WhatsApp chat"));
+  }
+  return res.json();
+}
+
+export async function getWhatsAppInstanceStatus(): Promise<{
+  success: boolean;
+  connected: boolean;
+  instanceName: string | null;
+  phoneNumber?: string;
+  status?: string;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/instance-status", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to get WhatsApp instance status"));
+  }
+  return res.json();
+}
+
+export async function getWhatsAppContacts(
+  limit: number = 50
+): Promise<{
+  success: boolean;
+  contacts: any[];
+  count: number;
+  instanceName: string | null;
+}> {
+  const headers = await getHeaders();
+  const res = await fetch("/api/whatsapp/contacts", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ limit }),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to get WhatsApp contacts"));
+  }
+  return res.json();
+}

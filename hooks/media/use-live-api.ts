@@ -25,6 +25,7 @@ import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
 import { useLogStore, useSettings, useAuth, useUI } from '@/lib/state';
+import { AVAILABLE_TOOLS } from '@/lib/tools';
 import { auth } from '@/lib/firebase';
 import * as api from '@/lib/api-client';
 
@@ -664,6 +665,200 @@ export function useLiveApi({
             }
           }
 
+          // WhatsApp handlers
+          if (fc.name === 'search_whatsapp_messages') {
+            const { phoneNumber, query, limit, instanceName } = fc.args as any;
+            if (!phoneNumber) {
+              responsePayload = { error: 'Missing phone number for WhatsApp search.' };
+            } else {
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/whatsapp/search', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ 
+                    phoneNumber, 
+                    query, 
+                    limit: limit || 20,
+                    instanceName: instanceName || 'beatrice'
+                  }),
+                });
+                const json = await res.json();
+                responsePayload = json;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'read_whatsapp_chat') {
+            const { phoneNumber, limit, instanceName } = fc.args as any;
+            if (!phoneNumber) {
+              responsePayload = { error: 'Missing phone number for WhatsApp chat read.' };
+            } else {
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/whatsapp/read', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ 
+                    phoneNumber, 
+                    limit: limit || 30,
+                    instanceName: instanceName || 'beatrice'
+                  }),
+                });
+                const json = await res.json();
+                responsePayload = json;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_status') {
+            const { instanceName } = fc.args as any;
+            try {
+              const token = await auth.currentUser?.getIdToken();
+              const res = await fetch('/api/whatsapp/status', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ 
+                  instanceName: instanceName || 'beatrice'
+                }),
+              });
+              const json = await res.json();
+              responsePayload = json;
+            } catch (e: any) {
+              responsePayload = { error: e.message };
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_contacts') {
+            const { limit, instanceName } = fc.args as any;
+            try {
+              const token = await auth.currentUser?.getIdToken();
+              const res = await fetch('/api/whatsapp/contacts', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ 
+                  limit: limit || 50,
+                  instanceName: instanceName || 'beatrice'
+                }),
+              });
+              const json = await res.json();
+              responsePayload = json;
+            } catch (e: any) {
+              responsePayload = { error: e.message };
+            }
+          }
+
+          if (fc.name === 'send_whatsapp_message') {
+            const { number, text, instanceName } = fc.args as any;
+            if (!number || !text) {
+              responsePayload = { error: 'Missing number or text for WhatsApp message.' };
+            } else {
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/whatsapp/send', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ number, text, instanceName: instanceName || 'beatrice' }),
+                });
+                const json = await res.json();
+                responsePayload = json;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'send_voice_message') {
+            const { phoneNumber, audioBase64, caption, instanceName } = fc.args as any;
+            if (!phoneNumber || !audioBase64) {
+              responsePayload = { error: 'Missing phone number or audio for voice message.' };
+            } else {
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/whatsapp/send-voice', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ 
+                    phoneNumber, 
+                    audioBase64, 
+                    caption,
+                    instanceName: instanceName || 'beatrice' 
+                  }),
+                });
+                const json = await res.json();
+                responsePayload = json;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
+          if (fc.name === 'get_whatsapp_phonebook') {
+            try {
+              const token = await auth.currentUser?.getIdToken();
+              const res = await fetch('/api/whatsapp/phonebook', {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              const json = await res.json();
+              responsePayload = json;
+            } catch (e: any) {
+              responsePayload = { error: e.message };
+            }
+          }
+
+          if (fc.name === 'initiate_whatsapp_call') {
+            const { phoneNumber, callType, instanceName } = fc.args as any;
+            if (!phoneNumber) {
+              responsePayload = { error: 'Missing phone number for WhatsApp call.' };
+            } else {
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/whatsapp/initiate-call', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ 
+                    phoneNumber, 
+                    callType: callType || 'voice',
+                    instanceName: instanceName || 'beatrice' 
+                  }),
+                });
+                const json = await res.json();
+                responsePayload = json;
+              } catch (e: any) {
+                responsePayload = { error: e.message };
+              }
+            }
+          }
+
         // Prepare the response
         functionResponses.push({
           id: fc.id,
@@ -689,29 +884,6 @@ export function useLiveApi({
       stopFillers();
       useUI.getState().setResultData(JSON.stringify(functionResponses, null, 2));
       useUI.getState().setShowResultPage(true);
-
-      if (fc.name === 'send_whatsapp_message') {
-          const { number, text } = fc.args as any;
-          if (!number || !text) {
-            responsePayload = { error: 'Missing number or text for WhatsApp message.' };
-          } else {
-            try {
-              const token = await auth.currentUser?.getIdToken();
-              const res = await fetch('/api/whatsapp/send', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ number, text }),
-              });
-              const json = await res.json();
-              responsePayload = json;
-            } catch (e: any) {
-              responsePayload = { error: e.message };
-            }
-          }
-        }
 
       client.sendToolResponse({ functionResponses: functionResponses });
     };
