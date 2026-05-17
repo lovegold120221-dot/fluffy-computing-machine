@@ -1,5 +1,10 @@
 import { auth } from "./firebase";
 
+// Use VPS backend when deployed (Vercel), relative path when local
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+  ? 'http://168.231.78.113:3000'
+  : '';
+
 async function getHeaders() {
   const user = auth.currentUser;
   if (!user) {
@@ -21,7 +26,7 @@ async function readApiError(res: Response, fallback: string) {
 
 export async function fetchCurrentUser() {
   const headers = await getHeaders();
-  const res = await fetch("/api/me", { headers });
+  const res = await fetch(`${API_BASE}/api/me`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch current user"));
   }
@@ -30,7 +35,7 @@ export async function fetchCurrentUser() {
 
 export async function fetchSettings() {
   const headers = await getHeaders();
-  const res = await fetch("/api/settings", { headers });
+  const res = await fetch(`${API_BASE}/api/settings`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch settings"));
   }
@@ -39,7 +44,7 @@ export async function fetchSettings() {
 
 export async function updateSettings(settings: any) {
   const headers = await getHeaders();
-  const res = await fetch("/api/settings", {
+  const res = await fetch(`${API_BASE}/api/settings`, {
     method: "PUT",
     headers,
     body: JSON.stringify(settings)
@@ -52,7 +57,7 @@ export async function updateSettings(settings: any) {
 
 export async function fetchMemories() {
   const headers = await getHeaders();
-  const res = await fetch("/api/memories", { headers });
+  const res = await fetch(`${API_BASE}/api/memories`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch memories"));
   }
@@ -61,7 +66,7 @@ export async function fetchMemories() {
 
 export async function saveMemory(content: string, type: string) {
   const headers = await getHeaders();
-  const res = await fetch("/api/memories", {
+  const res = await fetch(`${API_BASE}/api/memories`, {
     method: "POST",
     headers,
     body: JSON.stringify({ content, type })
@@ -74,7 +79,7 @@ export async function saveMemory(content: string, type: string) {
 
 export async function deleteMemory(id: number) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/memories/${id}`, {
+  const res = await fetch(`${API_BASE}/api/memories/${id}`, {
     method: "DELETE",
     headers
   });
@@ -87,7 +92,7 @@ export async function fetchConversations(limit = 100, options: { session_id?: st
   const params = new URLSearchParams({ limit: String(limit) });
   if (options.session_id) params.set("session_id", options.session_id);
   if (options.q) params.set("q", options.q);
-  const res = await fetch(`/api/conversations?${params.toString()}`, { headers });
+  const res = await fetch(`${API_BASE}/api/conversations?${params.toString()}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch conversations"));
   }
@@ -96,7 +101,7 @@ export async function fetchConversations(limit = 100, options: { session_id?: st
 
 export async function fetchConversationContext(limit = 60) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/conversations/context?limit=${encodeURIComponent(String(limit))}`, { headers });
+  const res = await fetch(`${API_BASE}/api/conversations/context?limit=${encodeURIComponent(String(limit))}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch conversation context"));
   }
@@ -120,7 +125,7 @@ export async function saveConversationTurn(
 ) {
   const headers = await getHeaders();
   const normalizedOptions = typeof options === "string" ? { session_id: options } : (options || {});
-  const res = await fetch("/api/conversations", {
+  const res = await fetch(`${API_BASE}/api/conversations`, {
     method: "POST",
     headers,
     body: JSON.stringify({ role, content, ...normalizedOptions })
@@ -133,7 +138,7 @@ export async function saveConversationTurn(
 
 export async function fetchVpsStatus() {
   const headers = await getHeaders();
-  const res = await fetch("/api/vps/status", { headers });
+  const res = await fetch(`${API_BASE}/api/vps/status`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch VPS status"));
   }
@@ -142,7 +147,7 @@ export async function fetchVpsStatus() {
 
 export async function fetchVpsOllamaModels(target: "self" | "cloud" = "self") {
   const headers = await getHeaders();
-  const res = await fetch(`/api/vps/ollama/models?target=${encodeURIComponent(target)}`, { headers });
+  const res = await fetch(`${API_BASE}/api/vps/ollama/models?target=${encodeURIComponent(target)}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch Ollama models"));
   }
@@ -157,7 +162,7 @@ export async function runVpsCommand(input: {
   confirmSystem?: boolean;
 }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/vps/terminal", {
+  const res = await fetch(`${API_BASE}/api/vps/terminal`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -176,7 +181,7 @@ export async function generateVpsOllama(input: {
   timeoutMs?: number;
 }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/vps/ollama/generate", {
+  const res = await fetch(`${API_BASE}/api/vps/ollama/generate`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -189,7 +194,7 @@ export async function generateVpsOllama(input: {
 
 export async function runVpsHermes(input: { prompt: string; timeoutMs?: number }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/vps/hermes/run", {
+  const res = await fetch(`${API_BASE}/api/vps/hermes/run`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -208,7 +213,7 @@ export async function runVpsSubAgents(input: {
   timeoutMs?: number;
 }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/vps/subagents/run", {
+  const res = await fetch(`${API_BASE}/api/vps/subagents/run`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -226,7 +231,7 @@ export async function delegateBackgroundTask(input: {
   timeoutMs?: number;
 }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/tasks/delegate", {
+  const res = await fetch(`${API_BASE}/api/tasks/delegate`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -239,7 +244,7 @@ export async function delegateBackgroundTask(input: {
 
 export async function fetchTaskStatus(taskId: string) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/tasks/status/${taskId}`, { headers });
+  const res = await fetch(`${API_BASE}/api/tasks/status/${taskId}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch task status"));
   }
@@ -248,7 +253,7 @@ export async function fetchTaskStatus(taskId: string) {
 
 export async function fetchActiveTasks() {
   const headers = await getHeaders();
-  const res = await fetch("/api/tasks/active", { headers });
+  const res = await fetch(`${API_BASE}/api/tasks/active`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch active tasks"));
   }
@@ -264,7 +269,7 @@ export async function createAutomation(input: {
   output?: Record<string, any>;
 }) {
   const headers = await getHeaders();
-  const res = await fetch("/api/automations", {
+  const res = await fetch(`${API_BASE}/api/automations`, {
     method: "POST",
     headers,
     body: JSON.stringify(input),
@@ -275,21 +280,21 @@ export async function createAutomation(input: {
 
 export async function fetchAutomations() {
   const headers = await getHeaders();
-  const res = await fetch("/api/automations", { headers });
+  const res = await fetch(`${API_BASE}/api/automations`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automations"));
   return res.json();
 }
 
 export async function fetchAutomation(id: string) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/automations/${id}`, { headers });
+  const res = await fetch(`${API_BASE}/api/automations/${id}`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automation"));
   return res.json();
 }
 
 export async function updateAutomation(id: string, updates: Record<string, any>) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/automations/${id}`, {
+  const res = await fetch(`${API_BASE}/api/automations/${id}`, {
     method: "PATCH",
     headers,
     body: JSON.stringify(updates),
@@ -300,7 +305,7 @@ export async function updateAutomation(id: string, updates: Record<string, any>)
 
 export async function deleteAutomation(id: string) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/automations/${id}`, {
+  const res = await fetch(`${API_BASE}/api/automations/${id}`, {
     method: "DELETE",
     headers,
   });
@@ -310,7 +315,7 @@ export async function deleteAutomation(id: string) {
 
 export async function runAutomationNow(id: string) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/automations/${id}/run`, {
+  const res = await fetch(`${API_BASE}/api/automations/${id}/run`, {
     method: "POST",
     headers,
   });
@@ -320,7 +325,7 @@ export async function runAutomationNow(id: string) {
 
 export async function fetchAutomationRuns(id: string) {
   const headers = await getHeaders();
-  const res = await fetch(`/api/automations/${id}/runs`, { headers });
+  const res = await fetch(`${API_BASE}/api/automations/${id}/runs`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automation runs"));
   return res.json();
 }
@@ -329,7 +334,7 @@ export async function fetchAutomationRuns(id: string) {
 
 export async function saveGoogleToken(accessToken: string, refreshToken?: string, expiresAt?: number) {
   const headers = await getHeaders();
-  const res = await fetch("/api/google-token", {
+  const res = await fetch(`${API_BASE}/api/google-token`, {
     method: "POST",
     headers,
     body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, expires_at: expiresAt }),
@@ -340,14 +345,14 @@ export async function saveGoogleToken(accessToken: string, refreshToken?: string
 
 export async function fetchGoogleToken(): Promise<{ access_token: string; refresh_token?: string; expires_at?: number }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/google-token", { headers });
+  const res = await fetch(`${API_BASE}/api/google-token`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch Google token"));
   return res.json();
 }
 
 export async function refreshGoogleToken(): Promise<{ access_token: string; expires_at?: number }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/google-token/refresh", {
+  const res = await fetch(`${API_BASE}/api/google-token/refresh`, {
     method: "POST",
     headers,
   });
@@ -364,7 +369,7 @@ export async function connectWhatsApp(): Promise<{
   pairingCode?: string;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/connect", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/connect`, {
     method: "POST",
     headers,
   });
@@ -378,14 +383,14 @@ export async function fetchWhatsAppStatus(): Promise<{
   phoneNumber?: string;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/status", { headers });
+  const res = await fetch(`${API_BASE}/api/whatsapp/status`, { headers });
   if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch WhatsApp status"));
   return res.json();
 }
 
 export async function sendWhatsAppMessage(number: string, text: string) {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/send", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/send`, {
     method: "POST",
     headers,
     body: JSON.stringify({ number, text }),
@@ -396,7 +401,7 @@ export async function sendWhatsAppMessage(number: string, text: string) {
 
 export async function disconnectWhatsApp() {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/disconnect", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/disconnect`, {
     method: "POST",
     headers,
   });
@@ -413,7 +418,7 @@ export async function fetchWhatsAppPhonebook(): Promise<{
   instanceName: string | null;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/phonebook", { headers });
+  const res = await fetch(`${API_BASE}/api/whatsapp/phonebook`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch WhatsApp phonebook"));
   }
@@ -451,7 +456,7 @@ export async function fetchWhatsAppActivities(options: {
   if (options.type) params.set("type", options.type);
   if (options.direction) params.set("direction", options.direction);
   
-  const res = await fetch(`/api/whatsapp/activities?${params.toString()}`, { headers });
+  const res = await fetch(`${API_BASE}/api/whatsapp/activities?${params.toString()}`, { headers });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch WhatsApp activities"));
   }
@@ -475,7 +480,7 @@ export async function generateCartesiaVoice(
   encoding: string;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/cartesia/generate-voice", {
+  const res = await fetch(`${API_BASE}/api/cartesia/generate-voice`, {
     method: "POST",
     headers,
     body: JSON.stringify({ text, language, emotion, speed, volume }),
@@ -495,7 +500,7 @@ export async function sendWhatsAppVoiceMessage(
   instanceName: string = 'beatrice'
 ): Promise<any> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/send-voice", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/send-voice`, {
     method: "POST",
     headers,
     body: JSON.stringify({ phoneNumber, audioBase64, caption, instanceName }),
@@ -514,7 +519,7 @@ export async function initiateWhatsAppCall(
   instanceName: string = 'beatrice'
 ): Promise<any> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/initiate-call", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/initiate-call`, {
     method: "POST",
     headers,
     body: JSON.stringify({ phoneNumber, callType, instanceName }),
@@ -538,7 +543,7 @@ export async function searchWhatsAppMessages(
   instanceName: string | null;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/search", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/search`, {
     method: "POST",
     headers,
     body: JSON.stringify({ phoneNumber, query, limit }),
@@ -559,7 +564,7 @@ export async function readWhatsAppChat(
   instanceName: string | null;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/read", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/read`, {
     method: "POST",
     headers,
     body: JSON.stringify({ phoneNumber, limit }),
@@ -578,7 +583,7 @@ export async function getWhatsAppInstanceStatus(): Promise<{
   status?: string;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/instance-status", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/instance-status`, {
     method: "POST",
     headers,
   });
@@ -597,7 +602,7 @@ export async function getWhatsAppContacts(
   instanceName: string | null;
 }> {
   const headers = await getHeaders();
-  const res = await fetch("/api/whatsapp/contacts", {
+  const res = await fetch(`${API_BASE}/api/whatsapp/contacts`, {
     method: "POST",
     headers,
     body: JSON.stringify({ limit }),
