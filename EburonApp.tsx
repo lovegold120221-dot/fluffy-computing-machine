@@ -119,6 +119,7 @@ export default function EburonApp() {
   const [currentUserProfile, setCurrentUserProfile] = useState<any | null>(null);
   const [longTermTurns, setLongTermTurns] = useState<any[]>([]);
   const savedTurnKeysRef = useRef<Set<string>>(new Set());
+  const [kbFiles, setKbFiles] = useState<{ name: string; content: string; size: number }[]>([]);
 
   // Session & Timer State
   const [sessionID, setSessionID] = useState<string>(() => makeSessionId());
@@ -889,6 +890,9 @@ ${profileContext || `Only the current Firebase-authenticated user is active.`}
 RECENT CONVERSATION HISTORY (Last Session):
 ${historyStr || `No previous conversation history.`}
 
+USER KNOWLEDGE BASE:
+${kbFiles.length > 0 ? kbFiles.map(f => `--- ${f.name} ---\n${f.content}`).join('\n\n') : 'No documents uploaded.'}
+
 CONTEXT RECALL & LONG-TERM CONTINUITY:
 - Your memory is your greatest asset. Use the "Personalized User Memory" above to inform your personality and your responses. 
 - If the above memory contains project summaries or decisions, assume those are the current ground truths.
@@ -969,7 +973,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         { functionDeclarations: [{ name: 'send_whatsapp_message', description: 'Send a WhatsApp message to a phone number. Use when the Boss asks to WhatsApp someone.', parameters: { type: 'object', properties: { number: { type: 'string', description: 'Phone number with country code, e.g. 31612345678' }, text: { type: 'string', description: 'Message text to send' } }, required: ['number', 'text'] } }] }
       ]
     } as any);
-  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile]);
+  }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile, kbFiles]);
 
   useEffect(() => {
     let interval: any;
@@ -1124,7 +1128,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
   };
 
   const handleToolAction = (toolId: string) => {
-    if (['history', 'tools', 'profile', 'settings', 'automation', 'whatsapp'].includes(toolId)) {
+    if (['history', 'tools', 'profile', 'settings', 'automation', 'whatsapp', 'kb'].includes(toolId)) {
       setActiveOverlay(toolId);
     } else {
       const prompts: Record<string, string> = {
@@ -1286,6 +1290,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <div className="skill-chip" onClick={() => handleToolAction('google')}><div className="skill-glyph bg-google"><i className="ph-fill ph-google-logo"></i></div><span className="skill-label">Google</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('signature')}><div className="skill-glyph bg-signature"><i className="ph-duotone ph-signature"></i></div><span className="skill-label">Sign</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('lookup')}><div className="skill-glyph bg-company"><i className="ph-duotone ph-buildings"></i></div><span className="skill-label">LookUp</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('kb')}><div className="skill-glyph bg-kb"><i className="ph-duotone ph-books"></i></div><span className="skill-label">KB</span></div>
           </div>
         </div>
         <div className="skills-row" data-row="2">
@@ -1730,6 +1735,67 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         </div>
         <div className="overlay-content">
           <WhatsAppConnectPanel />
+        </div>
+      </div>
+
+      {/* Knowledge Base Overlay */}
+      <div id="overlay-kb" className={`full-page-overlay ${activeOverlay === 'kb' ? 'active' : ''}`}>
+        <div className="overlay-header">
+          <div className="overlay-title"><i className="ph-fill ph-books" style={{ color: 'var(--accent-primary)', marginRight: '8px' }}></i>Knowledge Base</div>
+          <button className="close-overlay-btn" title="Close KB" onClick={() => setActiveOverlay(null)}><i className="ph-bold ph-x"></i></button>
+        </div>
+        <div className="overlay-content">
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>Upload documents to give Beatrice context. Supported: text, code, PDF (text layer), JSON, CSV, markdown, and more.</p>
+          <label style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            padding: '18px', border: '2px dashed var(--border-color)', borderRadius: '16px',
+            cursor: 'pointer', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '15px',
+            marginBottom: '24px', transition: 'border-color 0.2s'
+          }}>
+            <i className="ph-duotone ph-upload-simple" style={{ fontSize: '22px' }}></i>
+            Upload Files
+            <input type="file" multiple style={{ display: 'none' }} onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              const newFiles: { name: string; content: string; size: number }[] = [];
+              for (const file of files) {
+                try {
+                  const text = await file.text();
+                  newFiles.push({ name: file.name, content: text.slice(0, 50000), size: file.size });
+                } catch {
+                  newFiles.push({ name: file.name, content: `[Could not read file: ${file.name}]`, size: file.size });
+                }
+              }
+              setKbFiles(prev => [...prev, ...newFiles]);
+              e.target.value = '';
+            }} />
+          </label>
+          {kbFiles.length === 0 && (
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>No documents uploaded yet.</p>
+          )}
+          {kbFiles.map((f, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'var(--bg-chip)', borderRadius: '12px', padding: '12px 16px', marginBottom: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                <i className="ph-duotone ph-file-text" style={{ fontSize: '20px', color: 'var(--accent-primary)', flexShrink: 0 }}></i>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{(f.size / 1024).toFixed(1)} KB &bull; {f.content.length.toLocaleString()} chars</div>
+                </div>
+              </div>
+              <button onClick={() => setKbFiles(prev => prev.filter((_, idx) => idx !== i))} style={{
+                background: 'none', border: 'none', color: 'var(--accent-danger)', cursor: 'pointer', fontSize: '18px', padding: '4px'
+              }}><i className="ph-bold ph-trash"></i></button>
+            </div>
+          ))}
+          {kbFiles.length > 0 && (
+            <button onClick={() => setKbFiles([])} style={{
+              marginTop: '16px', width: '100%', padding: '14px', borderRadius: '50px',
+              background: 'var(--accent-danger)', color: '#fff', border: 'none',
+              fontWeight: 600, fontSize: '14px', cursor: 'pointer'
+            }}>Clear All Documents</button>
+          )}
         </div>
       </div>
 

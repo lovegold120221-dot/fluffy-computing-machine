@@ -135,6 +135,7 @@
     .bg-documents { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .bg-location { background: linear-gradient(135deg, #3b82f6, #4f46e5); }
     .bg-places { background: linear-gradient(135deg, #10b981, #059669); }
+    .bg-kb { background: linear-gradient(135deg, #f97316, #ea580c); }
 
     /* ---------------------------------------------------
        5. Chat Stream
