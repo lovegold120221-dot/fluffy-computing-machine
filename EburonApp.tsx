@@ -1464,72 +1464,76 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             </div>
           ) : (!allHistory || allHistory.length === 0) ? (
             <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>No history yet.</p>
-          ) : (
-            allHistory
-              .filter(t => {
-                // Search filter
-                const matchesSearch = (t.text || t.content || '').toLowerCase().includes(historySearch.toLowerCase());
-
-                // Role filter
-                let matchesRole = true;
-                if (historyRoleFilter !== 'all') {
-                  matchesRole = t.role === historyRoleFilter;
+          ) : (() => {
+            // Filter
+            const filtered = allHistory.filter(t => {
+              const matchesSearch = (t.text || t.content || '').toLowerCase().includes(historySearch.toLowerCase());
+              let matchesRole = true;
+              if (historyRoleFilter !== 'all') matchesRole = t.role === historyRoleFilter;
+              let matchesTool = true;
+              if (historyRoleFilter === 'system' && historyToolFilter !== 'all') matchesTool = t.toolName?.includes(historyToolFilter) || false;
+              let matchesDate = true;
+              if (historyDateRange !== 'all') {
+                const date = t.message_timestamp ? new Date(t.message_timestamp) : new Date();
+                const now = new Date();
+                if (historyDateRange === 'today') matchesDate = date.toDateString() === now.toDateString();
+                else if (historyDateRange === 'week') {
+                  const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
+                  matchesDate = date >= weekAgo;
                 }
+              }
+              return matchesSearch && matchesRole && matchesTool && matchesDate;
+            });
 
-                // Tool filter
-                let matchesTool = true;
-                if (historyRoleFilter === 'system' && historyToolFilter !== 'all') {
-                  matchesTool = t.toolName?.includes(historyToolFilter) || false;
-                }
+            // Group by session (source field)
+            const sessions = new Map<string, any[]>();
+            for (const t of filtered) {
+              const sid = t.source || `session-${new Date(t.message_timestamp || t.created_at).toDateString()}`;
+              if (!sessions.has(sid)) sessions.set(sid, []);
+              sessions.get(sid)!.push(t);
+            }
 
-                // Date filter
-                let matchesDate = true;
-                if (historyDateRange !== 'all') {
-                  const date = t.timestamp || new Date();
-                  const now = new Date();
-                  if (historyDateRange === 'today') {
-                    matchesDate = date.toDateString() === now.toDateString();
-                  } else if (historyDateRange === 'week') {
-                    const weekAgo = new Date();
-                    weekAgo.setDate(now.getDate() - 7);
-                    matchesDate = date >= weekAgo;
-                  }
-                }
+            // Sort sessions by newest first
+            const sortedSessions = Array.from(sessions.entries()).sort((a, b) => {
+              const aTime = new Date(a.value[0].message_timestamp || a.value[0].created_at).getTime();
+              const bTime = new Date(b.value[0].message_timestamp || b.value[0].created_at).getTime();
+              return bTime - aTime;
+            });
 
-                return matchesSearch && matchesRole && matchesTool && matchesDate;
-              })
-              .map((turn, idx) => (
-                <div
-                  key={idx}
-                  className={`history-item ${turn.role}`}
-                  style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    backgroundColor: turn.role === 'user' ? 'rgba(203,251,69,0.05)' : turn.role === 'system' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${turn.role === 'user' ? 'rgba(203,251,69,0.1)' : 'rgba(255,255,255,0.05)'}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      color: turn.role === 'user' ? 'var(--accent-active)' : 'var(--text-muted)'
-                    }}>
-                      {turn.role === 'user' ? userCallName : turn.role === 'system' ? 'System' : personaName}
-                    </span>
-                    {turn.isFinal && <i className="ph ph-check-circle" style={{ fontSize: '12px', color: 'var(--accent-active)', opacity: 0.5 }}></i>}
+            return sortedSessions.map(([sessionId, msgs]) => {
+              const sessionLabel = sessionId.startsWith('session-') ? sessionId : `Session ${sessionId.slice(0, 8)}`;
+              const sessionDate = msgs[0]?.message_timestamp || msgs[0]?.created_at;
+              const dateStr = new Date(sessionDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+              const userCount = msgs.filter(m => m.role === 'user').length;
+              return (
+                <details key={sessionId} className="history-session" style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                  <summary style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', fontSize: '13px', fontWeight: 600 }}>
+                    <span><i className="ph-fill ph-chats" style={{ marginRight: '8px', color: 'var(--accent-active)' }}></i>{sessionLabel}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 400 }}>{dateStr} &middot; {msgs.length} messages ({userCount} from you)</span>
+                  </summary>
+                  <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {msgs.map((turn, idx) => (
+                      <div key={idx} className={`history-item ${turn.role}`} style={{
+                        padding: '10px 12px', borderRadius: '10px',
+                        backgroundColor: turn.role === 'user' ? 'rgba(203,251,69,0.05)' : turn.role === 'system' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${turn.role === 'user' ? 'rgba(203,251,69,0.1)' : 'rgba(255,255,255,0.05)'}`,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: turn.role === 'user' ? 'var(--accent-active)' : 'var(--text-muted)' }}>
+                            {turn.role === 'user' ? userCallName : turn.role === 'system' ? 'System' : personaName}
+                          </span>
+                          {turn.message_timestamp && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(turn.message_timestamp).toLocaleTimeString()}</span>}
+                        </div>
+                        <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-main)' }}>
+                          <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
-                    <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
-                  </div>
-                </div>
-              ))
-          )}
+                </details>
+              );
+            });
+          })()}
         </div>
       </div>
 
