@@ -1,0 +1,12 @@
+{
+  "name": "Eburon AI Workspace",
+  "description": "Multimodal AI assistant with persistent memory and deep Google Workspace integration (Gmail, Drive, Calendar, Tasks).",
+  "requestFramePermissions": [
+    "microphone",
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

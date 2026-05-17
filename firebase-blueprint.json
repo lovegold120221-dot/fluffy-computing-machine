@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile data and memories",
+      "type": "object",
+      "properties": {
+        "memories": {
+          "type": "array",
+          "description": "List of memories for the user"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user document containing private memories"
+    }
+  }
+}

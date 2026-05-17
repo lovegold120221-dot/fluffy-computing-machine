@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Eburon AI | Complete Brand Assets + HTML Documents</title>
+<style>
+:root{--gold:#D4A017;--gold2:#F2BD39;--charcoal:#1A1A1A;--black:#000;--white:#fff;--card:#171717;--card2:#222;--line:#2B2B2B;--muted:#9B9BA1;--muted2:#666;--font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:var(--font);background:radial-gradient(circle at 84% 0,rgba(212,160,23,.13),transparent 34vw),radial-gradient(circle at 5% 90%,rgba(212,160,23,.08),transparent 26vw),#000;color:#fff;display:flex;overflow:hidden;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit}button{cursor:pointer}
+.sidebar{width:338px;flex:0 0 338px;background:linear-gradient(180deg,#151515,#090909);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:15px;overflow-y:auto}
+.brand{display:flex;gap:12px;align-items:center;padding:8px 10px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:linear-gradient(180deg,#151515,#101010);z-index:10}.brand-mark{width:46px;height:46px;border:1px solid var(--gold);border-radius:14px;display:grid;place-items:center;background:rgba(212,160,23,.08)}.brand-mark img{width:30px}.brand h1{margin:0;color:var(--gold);font-size:16px;letter-spacing:.9px}.brand p{margin:3px 0 0;color:var(--muted);font-size:10px;letter-spacing:1.5px;font-weight:800}
+.nav-label{font-size:10px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin:4px 0 8px;padding:0 12px}.nav-list{list-style:none;margin:0;padding:0;display:grid;gap:3px}.nav-item{display:flex;gap:10px;align-items:center;color:#e6e6ea;border:1px solid transparent;border-radius:10px;padding:9px 10px;font-size:13px;font-weight:700}.nav-item:hover{background:#222;border-color:rgba(255,255,255,.06)}.nav-item.active{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;font-weight:900}.nav-code{width:35px;font-size:10px;opacity:.72}.nav-text{flex:1}.nav-count{font-size:10px;opacity:.65}
+.side-bottom{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:10px}.side-card{background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.42);border-radius:14px;padding:14px}.side-card h4{margin:0 0 4px;color:var(--gold);font-size:13px}.side-card p{margin:0;color:var(--muted);font-size:11px;line-height:1.45}
+.main{flex:1;overflow-y:auto;padding:34px 42px 70px}.section{display:none;max-width:1500px;margin:0 auto;animation:fade .22s ease-out}.section.active{display:block}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px}.eyebrow{color:var(--gold);font-size:11px;font-weight:900;letter-spacing:1.35px;text-transform:uppercase;margin-bottom:8px}h2{font-size:clamp(26px,3vw,42px);line-height:1;margin:0 0 10px;letter-spacing:-1.1px}.header p{margin:0;color:var(--muted);max-width:780px;font-size:14px;line-height:1.55}.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:0;border-radius:10px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;padding:10px 14px;font-size:13px;font-weight:900;display:inline-flex;align-items:center;gap:8px}.btn:hover{transform:translateY(-1px)}.btn.secondary{color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.btn.small{font-size:11px;padding:7px 10px;border-radius:8px}
+.grid{display:grid;gap:16px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012)),var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}.card h3{margin:0 0 10px;color:var(--gold);font-size:15px}.card p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.muted{color:var(--muted)}.tiny{color:var(--muted);font-size:11px;line-height:1.45}.tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.tag{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#eee;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:800}
+.doc-studio{display:grid;grid-template-columns:390px minmax(0,1fr);gap:18px;align-items:start}.doc-panel{position:sticky;top:18px;display:grid;gap:14px;max-height:calc(100vh - 80px);overflow:auto;padding-right:4px}.search{background:#0e0e0e;border:1px solid var(--line);border-radius:12px;color:#fff;outline:none;padding:11px 12px;width:100%}.search:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,160,23,.13)}.doc-list{display:grid;gap:10px}
+.doc-tile{display:grid;grid-template-columns:58px 1fr;gap:12px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.014)),var(--card);border:1px solid var(--line);border-radius:15px;padding:12px;text-align:left;color:#fff;transition:.14s}.doc-tile:hover,.doc-tile.active{border-color:var(--gold);background:linear-gradient(180deg,rgba(212,160,23,.13),rgba(212,160,23,.035)),var(--card);transform:translateY(-1px)}.doc-icon{width:56px;height:70px;border-radius:7px;background:#fff;position:relative;box-shadow:0 9px 24px rgba(0,0,0,.38);overflow:hidden}.doc-icon:before{content:"";position:absolute;left:9px;right:9px;top:13px;height:6px;background:var(--gold);box-shadow:0 12px 0 #ddd,0 24px 0 #e9e9e9,0 36px 0 #f1f1f1}.doc-icon:after{content:"";position:absolute;right:0;top:0;border-width:0 15px 15px 0;border-style:solid;border-color:transparent #d8d8d8 transparent transparent}.doc-tile h4{margin:0 0 5px;font-size:13px}.doc-tile .meta{color:var(--gold);font-size:10px;font-weight:900;letter-spacing:.5px;margin-bottom:5px}.doc-tile p{margin:0 0 8px;color:var(--muted);font-size:11px;line-height:1.35}.doc-tile .formats{color:var(--muted2);font-size:10px}.open-chip{display:inline-flex;margin-top:8px;background:var(--gold);color:#000;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:900}
+.studio-main{display:grid;gap:16px}.selected-bar{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(180deg,rgba(212,160,23,.08),rgba(255,255,255,.02)),var(--card);border:1px solid rgba(212,160,23,.45);border-radius:16px;padding:16px}.selected-bar h3{margin:0 0 4px;color:var(--gold);font-size:18px}.selected-bar p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}.editor-preview{display:grid;grid-template-columns:minmax(330px,.43fr) minmax(0,.57fr);gap:16px;align-items:start}
+.form-panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}.form-panel h3{margin:0 0 10px;color:var(--gold)}.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.field.full{grid-column:1/-1}label{color:#dadae0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}input,select,textarea{width:100%;background:#0f0f0f;color:#fff;border:1px solid var(--line);border-radius:10px;outline:none;padding:10px 11px;font-size:13px}textarea{min-height:84px;resize:vertical}input:focus,textarea:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,160,23,.12)}
+.note{margin:8px 0 14px;padding:10px 12px;border-radius:12px;background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.18);color:var(--muted);font-size:12px;line-height:1.5}.esign{margin-top:14px;border:1px dashed rgba(212,160,23,.65);border-radius:14px;padding:14px;background:rgba(212,160,23,.055)}.sig-pad{height:92px;margin-top:10px;border-radius:10px;display:grid;place-items:center;color:var(--muted2);background:linear-gradient(transparent 82%,rgba(255,255,255,.1) 83%),#0b0b0b;font-size:12px}.checks{display:grid;gap:8px;margin-top:10px}.checkline{display:flex;gap:8px;color:var(--muted);font-size:12px;align-items:center}.checkline input{width:auto}
+.preview-shell{background:#090909;border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}.preview-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.preview-header strong{color:var(--gold);font-size:13px;letter-spacing:.5px}.preview-frame{width:100%;height:820px;border:0;border-radius:10px;background:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45)}.html-code{display:none;width:100%;height:820px;border-radius:10px;border:1px solid var(--line);background:#080808;color:#ddd;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:11px;line-height:1.5;resize:none;white-space:pre}.preview-shell.code-mode .preview-frame{display:none}.preview-shell.code-mode .html-code{display:block}
+.logo-preview{min-height:230px;display:grid;place-items:center;text-align:center;border:1px solid var(--line);border-radius:16px;background:linear-gradient(45deg,rgba(255,255,255,.018) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,.018) 25%,transparent 25%),var(--card);background-size:28px 28px}.logo-name{color:var(--gold);font-size:24px;font-weight:900;letter-spacing:1px;margin-top:10px}.logo-sub{color:var(--muted);font-size:10px;letter-spacing:2px;margin-top:4px}.swatches{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px}.swatch{width:185px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}.swatch-color{height:105px}.swatch-info{padding:13px}.swatch-info strong{font-size:12px;display:block;margin-bottom:4px}.swatch-info span{color:var(--muted);font-size:11px}
+.business-card{max-width:720px;aspect-ratio:1.75/1;border:1px solid var(--gold);border-radius:18px;background:radial-gradient(circle at 95% 0,rgba(212,160,23,.12),transparent 36%),var(--charcoal);display:flex;overflow:hidden;box-shadow:0 22px 80px rgba(0,0,0,.35);margin-bottom:24px}.business-card .left{width:45%;border-right:1px solid rgba(212,160,23,.25);display:grid;place-items:center;text-align:center}.business-card .right{width:55%;padding:44px;display:flex;flex-direction:column;justify-content:center}.person{font-size:20px;font-weight:900;letter-spacing:1px}.title{color:var(--gold);font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin:4px 0 22px}.contact-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;color:#eee;font-size:12px}.contact-list span{color:var(--gold);width:18px;display:inline-block}
+.asset-tile{min-height:170px;border:1px solid var(--line);border-radius:16px;padding:18px;background:radial-gradient(circle at 80% 10%,rgba(212,160,23,.16),transparent 28%),linear-gradient(135deg,#181818,#101010);overflow:hidden;position:relative}.asset-tile h4{margin:0 0 7px;color:#fff;font-size:15px}.asset-tile p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}.asset-symbol{width:48px;height:48px;border-radius:13px;border:1px solid var(--gold);display:grid;place-items:center;color:var(--gold);background:rgba(212,160,23,.08);margin-bottom:14px;font-size:22px;font-weight:900}.banner{min-height:160px;border:1px solid rgba(212,160,23,.55);border-radius:16px;padding:22px;background:linear-gradient(90deg,rgba(0,0,0,.85),rgba(0,0,0,.25)),radial-gradient(circle at 84% 45%,rgba(212,160,23,.24),transparent 28%),#0b0b0b;display:flex;align-items:center}.banner h3{margin:0;color:#fff;font-size:22px;text-transform:uppercase;line-height:1.05}.banner strong{color:var(--gold)}.post-card{aspect-ratio:1/1;min-height:230px;border:1px solid rgba(212,160,23,.55);border-radius:16px;padding:18px;background:radial-gradient(circle at 80% 25%,rgba(212,160,23,.2),transparent 28%),#0d0d0d;display:flex;flex-direction:column;justify-content:space-between}.post-card h4{margin:0;font-size:22px;line-height:1.04;text-transform:uppercase}.physical{min-height:250px;display:flex;flex-direction:column;justify-content:space-between}.physical-visual{height:150px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:radial-gradient(circle at center,rgba(212,160,23,.16),transparent 36%),#0d0d0d;display:grid;place-items:center;font-size:52px;color:var(--gold);margin-bottom:14px}.folder-tree{width:100%;min-height:470px;border:1px solid var(--line);border-radius:14px;background:#080808;color:#ddd;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;resize:none}
+@media(max-width:1260px){body{display:block;overflow:auto}.sidebar{width:100%;height:auto;display:block}.main{overflow:visible;padding:26px 18px 50px}.doc-studio{grid-template-columns:1fr}.doc-panel{position:static;max-height:none}.doc-list{grid-template-columns:repeat(2,minmax(0,1fr))}.editor-preview{grid-template-columns:1fr}.grid-5,.grid-4,.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.header,.selected-bar{display:block}.actions{margin-top:14px}.doc-list,.field-grid,.grid-5,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr}.business-card{aspect-ratio:auto;flex-direction:column}.business-card .left,.business-card .right{width:100%;padding:30px}.business-card .left{border-right:0;border-bottom:1px solid rgba(212,160,23,.25)}.preview-frame,.html-code{height:680px}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark"><img src="https://eburon.ai/icon-eburon.svg" alt="Eburon AI"></div><div><h1>EBURON AI</h1><p>ASSET + DOCUMENT STUDIO</p></div></div>
+  <div><div class="nav-label">Core Identity</div><ul class="nav-list">
+    <li class="nav-item" onclick="switchTab(event,'logo')"><span class="nav-code">01</span><span class="nav-text">Logo & Brand Identity</span><span class="nav-count">6</span></li>
+    <li class="nav-item" onclick="switchTab(event,'guide')"><span class="nav-code">02</span><span class="nav-text">Brand Guide</span><span class="nav-count">3</span></li>
+    <li class="nav-item" onclick="switchTab(event,'cards')"><span class="nav-code">03</span><span class="nav-text">Business Card</span><span class="nav-count">2</span></li>
+  </ul></div>
+  <div><div class="nav-label">HTML Documents</div><ul class="nav-list">
+    <li class="nav-item active" onclick="switchTab(event,'documents')"><span class="nav-code">04</span><span class="nav-text">Stationery & Documents</span><span class="nav-count">12</span></li>
+    <li class="nav-item" onclick="switchTab(event,'forms')"><span class="nav-code">04B</span><span class="nav-text">Form Inputs & E-Sign</span><span class="nav-count">HTML</span></li>
+    <li class="nav-item" onclick="switchTab(event,'email')"><span class="nav-code">14</span><span class="nav-text">Email Signature</span><span class="nav-count">HTML</span></li>
+  </ul></div>
+  <div><div class="nav-label">Digital Assets</div><ul class="nav-list">
+    <li class="nav-item" onclick="switchTab(event,'social-icons')"><span class="nav-code">05</span><span class="nav-text">Social Profile Icons</span><span class="nav-count">6</span></li>
+    <li class="nav-item" onclick="switchTab(event,'banners')"><span class="nav-code">06</span><span class="nav-text">Social Media Banners</span><span class="nav-count">3</span></li>
+    <li class="nav-item" onclick="switchTab(event,'posts')"><span class="nav-code">07</span><span class="nav-text">Social Post Templates</span><span class="nav-count">5</span></li>
+    <li class="nav-item" onclick="switchTab(event,'website')"><span class="nav-code">08</span><span class="nav-text">Website Preview</span><span class="nav-count">UI</span></li>
+  </ul></div>
+  <div><div class="nav-label">Print + Physical</div><ul class="nav-list">
+    <li class="nav-item" onclick="switchTab(event,'posters')"><span class="nav-code">09</span><span class="nav-text">Posters & Flyers</span><span class="nav-count">3</span></li>
+    <li class="nav-item" onclick="switchTab(event,'uniforms')"><span class="nav-code">10</span><span class="nav-text">Uniforms</span><span class="nav-count">3</span></li>
+    <li class="nav-item" onclick="switchTab(event,'idcard')"><span class="nav-code">11</span><span class="nav-text">ID Card & Lanyard</span><span class="nav-count">2</span></li>
+    <li class="nav-item" onclick="switchTab(event,'vehicle')"><span class="nav-code">12</span><span class="nav-text">Vehicle Branding</span><span class="nav-count">3</span></li>
+    <li class="nav-item" onclick="switchTab(event,'packaging')"><span class="nav-code">13</span><span class="nav-text">Packaging & Stationery</span><span class="nav-count">5</span></li>
+  </ul></div>
+  <div class="side-bottom">
+    <div class="side-card" onclick="switchTab(event,'folder')"><h4>Complete ZIP Structure</h4><p>Separate HTML document templates, e-sign modules, and brand asset folders.</p></div>
+    <div class="side-card"><h4>Tap-to-preview fixed</h4><p>Each document card now loads its own standalone HTML document in the preview.</p></div>
+  </div>
+</aside>
+<main class="main">
+<section id="documents" class="section active">
+  <div class="header"><div><div class="eyebrow">04. Stationery & Documents</div><h2>12 complete HTML documents with tap-to-preview</h2><p>Tap any document in the listing. The preview area loads that specific document as a full standalone HTML template. Use “View HTML” to see its source code and “Download Selected HTML” to save it.</p></div><div class="actions"><button class="btn" onclick="downloadCurrentDocument()">Download Selected HTML</button><button class="btn secondary" onclick="printCurrentDocument()">Print / Save PDF</button></div></div>
+  <div class="doc-studio">
+    <aside class="doc-panel"><input class="search" id="docSearch" placeholder="Search documents..." oninput="renderDocTiles()"><div class="doc-list" id="docList"></div></aside>
+    <div class="studio-main">
+      <div class="selected-bar"><div><h3 id="selectedTitle">Letterhead</h3><p id="selectedPurpose">Official branded blank company paper for notices and correspondence.</p></div><div class="actions"><button class="btn small" onclick="renderSelectedPreview()">Preview</button><button class="btn small secondary" onclick="toggleCodeMode()">View HTML</button><button class="btn small secondary" onclick="downloadCurrentDocument()">Download</button></div></div>
+      <div class="editor-preview">
+        <div class="form-panel"><h3>Document Inputs</h3><div class="note" id="fieldNote">Fields shown below are specific to the selected document.</div><form id="dataForm" oninput="renderSelectedPreview()"><div class="field-grid" id="dynamicFields"></div><div class="esign" id="esignBox"><label>E-Signature Module</label><div class="field-grid" style="margin-top:10px"><div class="field"><input name="signer_name" placeholder="Eburon signer name" value="Jo Lernout"></div><div class="field"><input name="signer_title" placeholder="Signer title" value="Founder"></div><div class="field"><input name="signer_email" type="email" placeholder="Signer email" value="jolernout@eburon.ai"></div><div class="field"><input name="signed_date" type="date"></div></div><div class="sig-pad">Signature pad / upload area</div><div class="checks"><label class="checkline"><input type="checkbox" checked> Consent to electronic signature</label><label class="checkline"><input type="checkbox"> Require counterparty signature</label><label class="checkline"><input type="checkbox"> Lock PDF after signing</label></div></div></form></div>
+        <div class="preview-shell" id="previewShell"><div class="preview-header"><strong id="previewLabel">Preview: Letterhead</strong><div class="actions"><button class="btn small secondary" onclick="openPreviewWindow()">Open Full Preview</button><button class="btn small secondary" onclick="copyCurrentHTML()">Copy HTML</button></div></div><iframe class="preview-frame" id="previewFrame" title="HTML document preview"></iframe><textarea class="html-code" id="htmlCode" readonly></textarea></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="forms" class="section"><div class="header"><div><div class="eyebrow">04B. Form Inputs & E-Sign</div><h2>Reusable form modules</h2><p>Inputs and form groups for client details, finance fields, policy metadata, contracts, and signature-ready documents.</p></div></div><div class="grid grid-3">
+  <div class="card"><h3>Client / Recipient Block</h3><p>Client company, VAT, address, contact name, email, phone, document number, issue date, due date, and validity date.</p><div class="tag-row"><span class="tag">text</span><span class="tag">email</span><span class="tag">date</span><span class="tag">textarea</span></div></div>
+  <div class="card"><h3>Finance Line Items</h3><p>Description, quantity, rate, subtotal, VAT, total, payment terms, bank details, and reference.</p><div class="tag-row"><span class="tag">number</span><span class="tag">computed</span><span class="tag">select</span></div></div>
+  <div class="card"><h3>Policy Metadata</h3><p>Version number, effective date, owner, support email, data controller, processor, and DPO contact.</p><div class="tag-row"><span class="tag">version</span><span class="tag">date</span><span class="tag">policy</span></div></div>
+  <div class="card"><h3>Contract Terms</h3><p>Scope, deliverables, fees, renewal, termination period, confidentiality term, and governing law.</p><div class="tag-row"><span class="tag">contract</span><span class="tag">legal</span></div></div>
+  <div class="card"><h3>E-Signature</h3><p>Signer name, title, email, signature pad/upload, consent checkbox, timestamp, and counterparty signature.</p><div class="tag-row"><span class="tag">signature</span><span class="tag">audit</span></div></div>
+  <div class="card"><h3>Export Actions</h3><p>Preview, view source, print/save PDF, copy HTML, download selected HTML, and open full preview window.</p><div class="tag-row"><span class="tag">preview</span><span class="tag">PDF</span><span class="tag">HTML</span></div></div>
+</div></section>
+
+<section id="logo" class="section"><div class="header"><div><div class="eyebrow">01. Logo & Brand Identity</div><h2>Logo assets</h2><p>Primary, horizontal, app icon, white logo, black logo, and gold icon.</p></div></div><div class="grid grid-3">
+  <div class="logo-preview"><div><img src="https://eburon.ai/icon-eburon.svg" style="width:92px"><div class="logo-name">EBURON AI</div><div class="logo-sub">— ARIOLAS BV —</div></div></div>
+  <div class="logo-preview"><div style="display:flex;align-items:center;gap:16px"><img src="https://eburon.ai/icon-eburon.svg" style="width:74px"><div style="text-align:left"><div class="logo-name">EBURON AI</div><div class="logo-sub">HORIZONTAL LOGO</div></div></div></div>
+  <div class="logo-preview"><div style="width:110px;height:110px;border:1px solid var(--gold);border-radius:24px;display:grid;place-items:center;background:#111"><img src="https://eburon.ai/icon-eburon.svg" style="width:70px"></div></div>
+  <div class="logo-preview"><div><img src="https://eburon.ai/icon-eburon.svg" style="width:80px;filter:grayscale(1) brightness(4)"><div class="logo-sub">WHITE LOGO</div></div></div>
+  <div class="logo-preview" style="background:#fff"><div><img src="https://eburon.ai/icon-eburon.svg" style="width:80px;filter:brightness(0)"><div class="logo-name" style="color:#000">EBURON AI</div><div class="logo-sub" style="color:#666">BLACK LOGO</div></div></div>
+  <div class="logo-preview"><div><img src="https://eburon.ai/icon-eburon.svg" style="width:90px"><div class="logo-sub">GOLD ICON</div></div></div>
+</div></section>
+
+<section id="guide" class="section"><div class="header"><div><div class="eyebrow">02. Brand Guide</div><h2>Brand guide</h2><p>Colors, typography, and brand elements.</p></div></div><div class="swatches"><div class="swatch"><div class="swatch-color" style="background:#D4A017"></div><div class="swatch-info"><strong>GOLD</strong><span>#D4A017</span></div></div><div class="swatch"><div class="swatch-color" style="background:#1A1A1A"></div><div class="swatch-info"><strong>CHARCOAL</strong><span>#1A1A1A</span></div></div><div class="swatch"><div class="swatch-color" style="background:#fff;border-bottom:1px solid var(--line)"></div><div class="swatch-info"><strong>WHITE</strong><span>#FFFFFF</span></div></div></div><div class="grid grid-3"><div class="card"><h3>Typography</h3><p>Apple system fonts / SF Pro. Bold headings, regular body copy, compact uppercase UI labels.</p></div><div class="card"><h3>Brand Elements</h3><p>Gold line accents, dark gradients, diagonal separators, circuit patterns, and AI-human visuals.</p></div><div class="card"><h3>Messaging</h3><p>“Innovate. Automate. Elevate.” and “Intelligent Solutions. Real Results.”</p></div></div></section>
+
+<section id="cards" class="section"><div class="header"><div><div class="eyebrow">03. Business Card</div><h2>Business card</h2><p>Front and back layout.</p></div></div><div class="business-card"><div class="left"><div><img src="https://eburon.ai/icon-eburon.svg" style="width:70px"><div class="logo-name">EBURON AI</div><div class="logo-sub">— ARIOLAS BV —</div></div></div><div class="right"><div class="person">JO LERNOUT</div><div class="title">Founder</div><ul class="contact-list"><li><span>☎</span>+32 489 74 20 69</li><li><span>✉</span>jolernout@eburon.ai</li><li><span>⌂</span>www.eburon.ai</li><li><span>⌖</span>Kempische Steenweg 305 bus 7, 2300 Herentals, Belgium</li></ul></div></div><div class="business-card" style="justify-content:center;align-items:center;flex-direction:column"><img src="https://eburon.ai/icon-eburon.svg" style="width:76px"><div class="logo-name">EBURON AI</div><div class="logo-sub">INTELLIGENT SOLUTIONS. REAL RESULTS.</div></div></section>
+
+<section id="social-icons" class="section"><div class="header"><div><div class="eyebrow">05. Social Media Profile Icons</div><h2>Social profile icons</h2><p>Platform icon pack.</p></div></div><div class="grid grid-3"><div class="asset-tile"><div class="asset-symbol">f</div><h4>Facebook</h4><p>Gold on charcoal circular icon.</p></div><div class="asset-tile"><div class="asset-symbol">◎</div><h4>Instagram</h4><p>Gold on charcoal circular icon.</p></div><div class="asset-tile"><div class="asset-symbol">in</div><h4>LinkedIn</h4><p>Gold on charcoal circular icon.</p></div><div class="asset-tile"><div class="asset-symbol">▶</div><h4>YouTube</h4><p>Gold on charcoal circular icon.</p></div><div class="asset-tile"><div class="asset-symbol">♪</div><h4>TikTok</h4><p>Gold on charcoal circular icon.</p></div><div class="asset-tile"><div class="asset-symbol">☏</div><h4>WhatsApp</h4><p>Gold on charcoal circular icon.</p></div></div></section>
+<section id="banners" class="section"><div class="header"><div><div class="eyebrow">06. Social Media Banners</div><h2>Social media banners</h2><p>Header/campaign designs.</p></div></div><div class="grid grid-3"><div class="banner"><h3>AI Solutions<br><strong>for your business</strong></h3></div><div class="banner"><h3>Innovate.<br>Automate.<br><strong>Elevate.</strong></h3></div><div class="banner"><h3>Intelligent<br>Solutions.<br><strong>Real Results.</strong></h3></div></div></section>
+<section id="posts" class="section"><div class="header"><div><div class="eyebrow">07. Social Media Post Templates</div><h2>Post templates</h2><p>Square 1080×1080 concepts.</p></div></div><div class="grid grid-5"><div class="post-card"><img src="https://eburon.ai/icon-eburon.svg" style="width:34px"><h4>AI Solutions for your business</h4><span class="tiny">www.eburon.ai</span></div><div class="post-card"><img src="https://eburon.ai/icon-eburon.svg" style="width:34px"><h4 style="color:var(--gold)">We are hiring!</h4><button class="btn small">Apply Now</button></div><div class="post-card"><img src="https://eburon.ai/icon-eburon.svg" style="width:34px"><h4>Innovate. Automate. Elevate.</h4><span class="tiny">www.eburon.ai</span></div><div class="post-card"><img src="https://eburon.ai/icon-eburon.svg" style="width:34px"><h4>Intelligent solutions. Real results.</h4><span class="tiny">www.eburon.ai</span></div><div class="post-card"><img src="https://eburon.ai/icon-eburon.svg" style="width:34px"><h4 style="color:var(--gold)">Coming soon</h4><span class="tiny">Stay tuned</span></div></div></section>
+<section id="website" class="section"><div class="header"><div><div class="eyebrow">08. Website Preview</div><h2>Website preview</h2><p>Homepage concept.</p></div></div><div class="card" style="padding:0;overflow:hidden"><div style="height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line)"><strong style="color:var(--gold);display:flex;align-items:center;gap:10px"><img src="https://eburon.ai/icon-eburon.svg" style="width:30px">EBURON AI</strong><span class="tiny">HOME · SERVICES · SOLUTIONS · ABOUT · CONTACT</span><button class="btn small">Get in Touch</button></div><div style="min-height:420px;display:flex;align-items:center;padding:48px;background:linear-gradient(90deg,#090909,rgba(9,9,9,.6)),radial-gradient(circle at 80% 45%,rgba(212,160,23,.3),transparent 25%)"><div><h2>AI SOLUTIONS<br>FOR YOUR BUSINESS</h2><p class="muted">Innovate. Automate. Elevate.</p><div style="margin-top:18px"><button class="btn">Learn More</button></div></div></div></div></section>
+<section id="posters" class="section"><div class="header"><div><div class="eyebrow">09. Posters & Flyers</div><h2>Posters and flyers</h2><p>Print campaign layouts.</p></div></div><div class="grid grid-3"><div class="post-card" style="aspect-ratio:.72/1;min-height:360px"><h4>AI Solutions for your business</h4><span class="tiny">www.eburon.ai</span></div><div class="post-card" style="aspect-ratio:.72/1;min-height:360px"><h4 style="color:var(--gold)">We are hiring!</h4><button class="btn small">Join our team</button></div><div class="post-card" style="aspect-ratio:.72/1;min-height:360px"><h4>Innovate. Automate. Elevate.</h4><span class="tiny">www.eburon.ai</span></div></div></section>
+<section id="uniforms" class="section"><div class="header"><div><div class="eyebrow">10. Uniforms</div><h2>Uniforms</h2><p>Polo, jacket, and cap.</p></div></div><div class="grid grid-3"><div class="card physical"><div class="physical-visual">👕</div><h3>Polo Shirt</h3></div><div class="card physical"><div class="physical-visual">🧥</div><h3>Softshell Jacket</h3></div><div class="card physical"><div class="physical-visual">🧢</div><h3>Cap</h3></div></div></section>
+<section id="idcard" class="section"><div class="header"><div><div class="eyebrow">11. ID Card & Lanyard</div><h2>ID card and lanyard</h2><p>Employee badge system.</p></div></div><div class="grid grid-2"><div class="card" style="display:grid;place-items:center"><div style="width:190px;height:300px;border:1px solid var(--gold);border-radius:18px;background:#111;padding:18px;text-align:center"><img src="https://eburon.ai/icon-eburon.svg" style="width:40px"><div style="width:84px;height:84px;border-radius:50%;background:#ddd;margin:20px auto"></div><div class="person" style="font-size:15px">JO LERNOUT</div><div class="title">Founder</div><span class="tag">ID: EBU-001</span></div></div><div class="card physical"><div class="physical-visual">〰</div><h3>Branded Lanyard</h3><p>Black and gold strap with repeating icon.</p></div></div></section>
+<section id="vehicle" class="section"><div class="header"><div><div class="eyebrow">12. Vehicle Branding</div><h2>Vehicle branding</h2><p>Car, van, and rear placement.</p></div></div><div class="grid grid-3"><div class="card physical"><div class="physical-visual">🚗</div><h3>Car Wrap</h3></div><div class="card physical"><div class="physical-visual">🚐</div><h3>Van Wrap</h3></div><div class="card physical"><div class="physical-visual">🚙</div><h3>Rear View</h3></div></div></section>
+<section id="packaging" class="section"><div class="header"><div><div class="eyebrow">13. Packaging & Stationery</div><h2>Packaging and stationery</h2><p>Box, bag, notebook, pen, and USB drive.</p></div></div><div class="grid grid-5"><div class="card physical"><div class="physical-visual">▰</div><h3>Box</h3></div><div class="card physical"><div class="physical-visual">🛍</div><h3>Paper Bag</h3></div><div class="card physical"><div class="physical-visual">📓</div><h3>Notebook</h3></div><div class="card physical"><div class="physical-visual">🖊</div><h3>Pen</h3></div><div class="card physical"><div class="physical-visual">▣</div><h3>USB Drive</h3></div></div></section>
+<section id="email" class="section"><div class="header"><div><div class="eyebrow">14. Email Signature</div><h2>Email signature</h2><p>HTML signature block.</p></div></div><div class="card" style="background:#fff;color:#111;max-width:760px;display:flex;gap:20px;align-items:center"><div style="border-right:2px solid #D4A017;padding-right:18px;text-align:center"><img src="https://eburon.ai/icon-eburon.svg" style="width:60px"><div style="color:#D4A017;font-weight:900;letter-spacing:1px">EBURON AI</div><div style="font-size:9px;color:#777;letter-spacing:1.4px">ARIOLAS BV</div></div><div><strong>JO LERNOUT</strong><br><span style="font-size:12px;color:#666">Founder</span><p style="color:#222;margin-top:8px;font-size:12px;line-height:1.7">☎ +32 489 74 20 69<br>✉ jolernout@eburon.ai<br>⌂ www.eburon.ai<br>⌖ Kempische Steenweg 305 bus 7, 2300 Herentals, Belgium</p></div></div></section>
+<section id="folder" class="section"><div class="header"><div><div class="eyebrow">Complete Package</div><h2>Folder structure</h2><p>Recommended export structure with separate HTML document templates.</p></div></div><textarea class="folder-tree" readonly>eburon_ai_complete_assets/
+├── 01_Logo_And_Brand_Identity/
+├── 02_Brand_Guide/
+├── 03_Business_Cards/
+├── 04_Stationery_And_Documents/
+├── 04B_Documents_HTML/
+│   ├── letterhead.html
+│   ├── invoice.html
+│   ├── quotation.html
+│   ├── business-letter.html
+│   ├── service-policy.html
+│   ├── terms-conditions.html
+│   ├── privacy-policy.html
+│   ├── gdpr-compliance.html
+│   ├── service-agreement.html
+│   ├── employment-contract.html
+│   ├── nda-agreement.html
+│   └── freelancer-agreement.html
+├── 04C_Form_Inputs_And_ESign/
+├── 05_Social_Media_Profile_Icons/
+├── 06_Social_Media_Banners/
+├── 07_Social_Media_Posts/
+├── 08_Website_Preview/
+├── 09_Posters_Flyers/
+├── 10_Uniforms/
+├── 11_ID_Card_And_Lanyard/
+├── 12_Vehicle_Branding/
+├── 13_Packaging_And_Stationery/
+└── 14_Email_Signature/</textarea></section>
+</main>
+
+<script>
+const DOCS = [{"id": "letterhead", "code": "04.01", "title": "Letterhead", "cat": "Stationery", "formats": "HTML / DOCX / PDF", "sign": false, "desc": "Official branded blank company paper for notices and correspondence."}, {"id": "invoice", "code": "04.02", "title": "Invoice", "cat": "Finance", "formats": "HTML / XLSX / PDF", "sign": false, "desc": "Invoice with client data, line items, VAT, totals, and payment terms."}, {"id": "quotation", "code": "04.03", "title": "Quotation", "cat": "Finance", "formats": "HTML / XLSX / PDF / E-SIGN", "sign": true, "desc": "Quote/proposal with scope, price, validity, and approval signature."}, {"id": "business-letter", "code": "04.04", "title": "Business Letter", "cat": "Correspondence", "formats": "HTML / DOCX / PDF / E-SIGN", "sign": true, "desc": "Formal business letter with recipient block and closing signature."}, {"id": "service-policy", "code": "04.05", "title": "Service Policy", "cat": "Policy", "formats": "HTML / PDF", "sign": false, "desc": "Service delivery policy for AI consulting and automation work."}, {"id": "terms", "code": "04.06", "title": "Terms & Conditions", "cat": "Legal", "formats": "HTML / PDF / E-SIGN", "sign": true, "desc": "Commercial legal terms for services, fees, liability, IP, and termination."}, {"id": "privacy", "code": "04.07", "title": "Privacy Policy", "cat": "Legal", "formats": "HTML / PDF", "sign": false, "desc": "Privacy policy for personal data use, retention, rights, and contact details."}, {"id": "gdpr", "code": "04.08", "title": "GDPR Compliance", "cat": "Compliance", "formats": "HTML / PDF / E-SIGN", "sign": true, "desc": "GDPR declaration with processing, security, rights, and breach workflow."}, {"id": "service-agreement", "code": "04.09", "title": "Service Agreement", "cat": "Contract", "formats": "HTML / DOCX / PDF / E-SIGN", "sign": true, "desc": "Client service contract for AI automation delivery, fees, scope, and signatures."}, {"id": "employment", "code": "04.10", "title": "Employment Contract", "cat": "HR", "formats": "HTML / DOCX / PDF / E-SIGN", "sign": true, "desc": "Employment contract with role, salary, duties, confidentiality, and signatures."}, {"id": "nda", "code": "04.11", "title": "NDA Agreement", "cat": "Legal", "formats": "HTML / DOCX / PDF / E-SIGN", "sign": true, "desc": "Confidentiality agreement for protected business and technical information."}, {"id": "freelancer", "code": "04.12", "title": "Freelancer Agreement", "cat": "Contract", "formats": "HTML / DOCX / PDF / E-SIGN", "sign": true, "desc": "Contractor agreement with deliverables, fees, IP assignment, and signatures."}];
+const DEFAULTS = {
+  company_name:"Eburon AI / Ariolas BV",
+  company_address:"Kempische Steenweg 305 bus 7\n2300 Herentals, Belgium",
+  company_email:"jolernout@eburon.ai",
+  contact_email:"jolernout@eburon.ai",
+  dpo_email:"privacy@eburon.ai",
+  company_website:"www.eburon.ai",
+  sender_name:"Jo Lernout",
+  sender_title:"Founder",
+  signer_name:"Jo Lernout",
+  signer_title:"Founder",
+  signer_email:"jolernout@eburon.ai",
+  recipient_name:"Recipient Name",
+  recipient_company:"Client Company Name",
+  recipient_address:"Client Street 1\n1000 Brussels\nBelgium",
+  client_company:"Client Company Name",
+  client_vat:"BE0123.456.789",
+  client_address:"Client Street 1\n1000 Brussels\nBelgium",
+  invoice_no:"INV-2026-001",
+  quote_no:"QUO-2026-001",
+  agreement_no:"AGR-2026-001",
+  issue_date:"",
+  due_date:"",
+  valid_until:"",
+  effective_date:"",
+  end_date:"",
+  signed_date:"",
+  subject:"AI Automation Services",
+  body:"Thank you for your interest in Eburon AI. This document is prepared as an official branded communication template. Replace this body with your final message before sending.",
+  scope:"AI automation consulting, workflow analysis, implementation support, and reporting.",
+  item_1:"AI automation consulting package",
+  qty_1:"1",
+  rate_1:"1200",
+  payment_terms:"Due within 14 days",
+  policy_version:"1.0",
+  governing_law:"Belgian law",
+  processor_name:"Eburon AI / Ariolas BV",
+  fee:"1200",
+  employee_name:"Employee Name",
+  employee_address:"Employee Street 1\n1000 Brussels\nBelgium",
+  role_title:"AI Automation Specialist",
+  start_date:"",
+  salary:"To be agreed",
+  work_location:"Hybrid / Belgium",
+  counterparty_name:"Counterparty Name",
+  counterparty_address:"Counterparty Street 1\n1000 Brussels\nBelgium",
+  confidentiality_term:"3 years",
+  purpose:"Evaluation and collaboration regarding AI automation services.",
+  freelancer_name:"Freelancer Name",
+  freelancer_address:"Freelancer Street 1\n1000 Brussels\nBelgium",
+  project_name:"AI Automation Project",
+  deliverables:"Workflow mapping, implementation support, testing, documentation, and handover."
+};
+const FIELDS = {
+  letterhead:["recipient_name","recipient_company","recipient_address","subject","body","sender_name","sender_title"],
+  invoice:["client_company","client_vat","client_address","invoice_no","issue_date","due_date","item_1","qty_1","rate_1","payment_terms"],
+  quotation:["client_company","client_address","quote_no","issue_date","valid_until","scope","item_1","qty_1","rate_1","approver_name"],
+  "business-letter":["recipient_name","recipient_company","recipient_address","subject","body","sender_name","sender_title"],
+  "service-policy":["effective_date","policy_version","company_name","contact_email"],
+  terms:["effective_date","policy_version","company_name","contact_email","governing_law"],
+  privacy:["effective_date","policy_version","company_name","contact_email","dpo_email"],
+  gdpr:["effective_date","policy_version","company_name","contact_email","dpo_email","processor_name"],
+  "service-agreement":["client_company","client_address","agreement_no","effective_date","end_date","scope","fee","payment_terms","signer_name","counterparty_name"],
+  employment:["employee_name","employee_address","role_title","start_date","salary","work_location","signer_name","counterparty_name"],
+  nda:["counterparty_name","counterparty_address","effective_date","confidentiality_term","purpose","signer_name"],
+  freelancer:["freelancer_name","freelancer_address","project_name","effective_date","deliverables","fee","payment_terms","signer_name"]
+};
+let selectedDocId = "letterhead";
+let currentHTML = "";
+
+function setDates(){
+  const today = new Date();
+  const due = new Date(); due.setDate(today.getDate()+14);
+  const valid = new Date(); valid.setDate(today.getDate()+30);
+  const end = new Date(today.getFullYear()+1,today.getMonth(),today.getDate());
+  const fmt = d => d.toISOString().slice(0,10);
+  DEFAULTS.issue_date = fmt(today);
+  DEFAULTS.effective_date = fmt(today);
+  DEFAULTS.start_date = fmt(today);
+  DEFAULTS.signed_date = fmt(today);
+  DEFAULTS.due_date = fmt(due);
+  DEFAULTS.valid_until = fmt(valid);
+  DEFAULTS.end_date = fmt(end);
+}
+function switchTab(event,id){
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  if(event && event.currentTarget && event.currentTarget.classList.contains("nav-item")) event.currentTarget.classList.add("active");
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+  const target = document.getElementById(id);
+  if(target) target.classList.add("active");
+}
+function getDoc(){return DOCS.find(d=>d.id===selectedDocId)||DOCS[0]}
+function renderDocTiles(){
+  const q = (document.getElementById("docSearch")?.value || "").toLowerCase();
+  const filtered = DOCS.filter(d => [d.title,d.desc,d.cat,d.formats].join(" ").toLowerCase().includes(q));
+  document.getElementById("docList").innerHTML = filtered.map(d => `
+    <button class="doc-tile ${d.id===selectedDocId ? "active" : ""}" type="button" onclick="selectDoc('${d.id}')">
+      <div class="doc-icon"></div>
+      <div>
+        <div class="meta">${d.code} · ${d.cat}</div>
+        <h4>${escapeHTML(d.title)}</h4>
+        <p>${escapeHTML(d.desc)}</p>
+        <div class="formats">${escapeHTML(d.formats)}</div>
+        <span class="open-chip">Tap to preview</span>
+      </div>
+    </button>
+  `).join("");
+}
+function selectDoc(id){
+  selectedDocId = id;
+  const d = getDoc();
+  document.getElementById("selectedTitle").textContent = d.title;
+  document.getElementById("selectedPurpose").textContent = d.desc;
+  document.getElementById("previewLabel").textContent = "Preview: " + d.title;
+  document.getElementById("fieldNote").textContent = "Fields below are specific to " + d.title + ". The preview is a complete standalone HTML document.";
+  document.getElementById("esignBox").style.display = d.sign ? "block" : "none";
+  renderDocTiles();
+  renderFields(d);
+  renderSelectedPreview();
+  document.getElementById("previewShell").classList.remove("code-mode");
+}
+function readable(k){return k.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}
+function renderFields(doc){
+  const common = ["company_name","company_address","company_email","company_website"];
+  const fields = Array.from(new Set(common.concat(FIELDS[doc.id] || [])));
+  document.getElementById("dynamicFields").innerHTML = fields.map(name => {
+    const value = DEFAULTS[name] || "";
+    const long = ["body","scope","client_address","recipient_address","company_address","deliverables","employee_address","counterparty_address","freelancer_address","purpose"].includes(name);
+    const type = name.includes("date") || name === "start_date" || name === "end_date" || name === "valid_until" ? "date" : (name.includes("email") ? "email" : (name.includes("rate") || name === "fee" || name.includes("qty") ? "number" : "text"));
+    if(long) return `<div class="field full"><label>${readable(name)}</label><textarea name="${name}">${escapeHTML(value)}</textarea></div>`;
+    return `<div class="field"><label>${readable(name)}</label><input type="${type}" name="${name}" value="${escapeAttr(value)}"></div>`;
+  }).join("");
+}
+function getFormData(){
+  const data = Object.assign({}, DEFAULTS);
+  const form = document.getElementById("dataForm");
+  if(form){ for(const [k,v] of new FormData(form).entries()) data[k] = v; }
+  return data;
+}
+function renderSelectedPreview(){
+  const doc = getDoc();
+  const data = getFormData();
+  currentHTML = buildDocumentHTML(doc,data);
+  const frame = document.getElementById("previewFrame");
+  frame.srcdoc = currentHTML;
+  document.getElementById("htmlCode").value = currentHTML;
+}
+function money(v){return new Intl.NumberFormat("en-BE",{style:"currency",currency:"EUR"}).format(Number(v||0))}
+function escapeHTML(s){return String(s ?? "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m] || m))}
+function escapeAttr(s){return escapeHTML(s).replace(/"/g,"&quot;")}
+function nl2br(s){return escapeHTML(s).replace(/\n/g,"<br>")}
+function docCSS(){
+  return `:root{--gold:#D4A017;--charcoal:#1A1A1A}*{box-sizing:border-box}body{margin:0;background:#e9e9e9;color:#151515;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}.page{width:794px;min-height:1123px;margin:0 auto;background:#fff;padding:52px 58px;box-shadow:0 20px 80px rgba(0,0,0,.18);position:relative}.top-line{position:absolute;left:0;right:0;top:0;height:8px;background:var(--gold)}header{display:flex;justify-content:space-between;gap:26px;align-items:flex-start;border-bottom:2px solid var(--gold);padding-bottom:18px;margin-bottom:30px}.doc-brand{display:flex;gap:12px;align-items:center}.doc-brand img{width:42px;height:42px}.doc-brand strong{display:block;color:var(--gold);letter-spacing:1px;font-size:17px}.doc-brand span{display:block;color:#777;letter-spacing:1.7px;font-size:9px;font-weight:700}.company{font-size:10.5px;line-height:1.55;color:#333;text-align:right}h1{color:#151515;font-size:28px;letter-spacing:-.5px;margin:0 0 8px;text-transform:uppercase}h2{color:var(--gold);font-size:15px;text-transform:uppercase;letter-spacing:.7px;margin:28px 0 10px}p,li{font-size:12px;line-height:1.75;color:#333}.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 24px}.meta-box{background:#f7f7f7;border-left:4px solid var(--gold);padding:12px;font-size:11.5px;line-height:1.65;color:#333}.meta-box strong{color:#111}.doc-no{display:inline-block;background:var(--charcoal);color:#fff;padding:6px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.4px}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:11.5px}th{background:var(--gold);color:#111;text-align:left;padding:9px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}td{border-bottom:1px solid #e7e7e7;padding:9px;vertical-align:top;color:#333}.total td{font-weight:800;color:#111}.notice{background:#fff9e8;border:1px solid #f0d68b;padding:12px;border-radius:8px;margin:16px 0}.signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:46px}.sig{border-top:1px solid #111;padding-top:8px;font-size:11px;color:#333;min-height:74px}.signature-pad{border:1px dashed #c99a17;height:80px;border-radius:8px;margin-top:10px;display:grid;place-items:center;color:#999;font-size:11px}footer{position:absolute;left:58px;right:58px;bottom:34px;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between;font-size:9px;color:#777}.watermark{position:absolute;right:50px;bottom:92px;opacity:.035;width:220px}@media print{body{background:#fff}.page{box-shadow:none;margin:0;width:auto;min-height:auto}}`;
+}
+function docHeader(d){
+  return `<div class="top-line"></div><header><div class="doc-brand"><img src="https://eburon.ai/icon-eburon.svg" alt="Eburon AI"><div><strong>EBURON AI</strong><span>ARIOLAS BV</span></div></div><div class="company">${nl2br(d.company_address)}<br>${escapeHTML(d.company_email)}<br>${escapeHTML(d.company_website)}</div></header>`;
+}
+function signBlock(d,label){
+  return `<section><h2>Electronic Signature</h2><p>By signing below, the signer confirms authority to sign and agrees that this document may be executed electronically.</p><div class="signature-grid"><div class="sig">For Eburon AI / Ariolas BV<br><strong>${escapeHTML(d.signer_name)}</strong><br>${escapeHTML(d.signer_title)}<div class="signature-pad">Signature</div>Date: ${escapeHTML(d.signed_date)}</div><div class="sig">For ${escapeHTML(label || "Client / Counterparty")}<br><strong>${escapeHTML(d.counterparty_name || d.approver_name || "")}</strong><br>Authorized Signatory<div class="signature-pad">Signature</div>Date: __________________</div></div></section>`;
+}
+function wrapDoc(doc,d,content){
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHTML(doc.title)} | Eburon AI</title><style>${docCSS()}</style></head><body><main class="page">${docHeader(d)}${content}<img class="watermark" src="https://eburon.ai/icon-eburon.svg" alt=""><footer><span>Eburon AI / Ariolas BV</span><span>${escapeHTML(doc.title)} · Generated HTML Template</span></footer></main></body></html>`;
+}
+function buildDocumentHTML(doc,d){
+  const qty = Number(d.qty_1 || 0), rate = Number(d.rate_1 || d.fee || 0), subtotal = qty * rate, vat = subtotal * 0.21, total = subtotal + vat;
+  let content = "";
+  if(doc.id==="letterhead"){
+    content = `<span class="doc-no">Official Letterhead</span><div style="height:34px"></div><p>${escapeHTML(d.issue_date)}</p><div class="meta-grid"><div class="meta-box"><strong>To</strong><br>${escapeHTML(d.recipient_name)}<br>${escapeHTML(d.recipient_company)}<br>${nl2br(d.recipient_address)}</div><div class="meta-box"><strong>Subject</strong><br>${escapeHTML(d.subject)}</div></div><h1>${escapeHTML(d.subject)}</h1><p>${nl2br(d.body)}</p><p>Sincerely,</p><p><strong>${escapeHTML(d.sender_name)}</strong><br>${escapeHTML(d.sender_title)}<br>Eburon AI / Ariolas BV</p>`;
+  } else if(doc.id==="invoice"){
+    content = `<h1>Invoice</h1><p><span class="doc-no">${escapeHTML(d.invoice_no)}</span></p><div class="meta-grid"><div class="meta-box"><strong>Bill To</strong><br>${escapeHTML(d.client_company)}<br>VAT: ${escapeHTML(d.client_vat)}<br>${nl2br(d.client_address)}</div><div class="meta-box"><strong>Issue Date</strong>: ${escapeHTML(d.issue_date)}<br><strong>Due Date</strong>: ${escapeHTML(d.due_date)}<br><strong>Payment Terms</strong>: ${escapeHTML(d.payment_terms)}</div></div><table><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead><tbody><tr><td>${escapeHTML(d.item_1)}</td><td>${escapeHTML(d.qty_1)}</td><td>${money(rate)}</td><td>${money(subtotal)}</td></tr><tr><td colspan="3">VAT 21%</td><td>${money(vat)}</td></tr><tr class="total"><td colspan="3">Amount Due</td><td>${money(total)}</td></tr></tbody></table><div class="notice"><p><strong>Payment Method:</strong> Bank transfer. Please include invoice number ${escapeHTML(d.invoice_no)} as payment reference.</p></div>`;
+  } else if(doc.id==="quotation"){
+    content = `<h1>Quotation</h1><p><span class="doc-no">${escapeHTML(d.quote_no)}</span></p><div class="meta-grid"><div class="meta-box"><strong>Prepared For</strong><br>${escapeHTML(d.client_company)}<br>${nl2br(d.client_address)}</div><div class="meta-box"><strong>Issue Date</strong>: ${escapeHTML(d.issue_date)}<br><strong>Valid Until</strong>: ${escapeHTML(d.valid_until)}<br><strong>Prepared By</strong>: Eburon AI</div></div><h2>Scope</h2><p>${nl2br(d.scope)}</p><table><thead><tr><th>Service</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead><tbody><tr><td>${escapeHTML(d.item_1)}</td><td>${escapeHTML(d.qty_1)}</td><td>${money(rate)}</td><td>${money(subtotal)}</td></tr><tr><td colspan="3">VAT 21%</td><td>${money(vat)}</td></tr><tr class="total"><td colspan="3">Quoted Total</td><td>${money(total)}</td></tr></tbody></table><div class="notice"><p>Approval authorizes Eburon AI / Ariolas BV to prepare the corresponding agreement or invoice.</p></div>${signBlock(d,d.client_company)}`;
+  } else if(doc.id==="business-letter"){
+    content = `<h1>Business Letter</h1><p>${escapeHTML(d.issue_date)}</p><div class="meta-box"><strong>Recipient</strong><br>${escapeHTML(d.recipient_name)}<br>${escapeHTML(d.recipient_company)}<br>${nl2br(d.recipient_address)}</div><h2>${escapeHTML(d.subject)}</h2><p>Dear ${escapeHTML(d.recipient_name)},</p><p>${nl2br(d.body)}</p><p>Kind regards,</p><p><strong>${escapeHTML(d.sender_name)}</strong><br>${escapeHTML(d.sender_title)}<br>Eburon AI / Ariolas BV</p>${signBlock(d,d.recipient_company)}`;
+  } else if(doc.id==="service-policy"){
+    content = `<h1>Service Policy</h1><p><span class="doc-no">Version ${escapeHTML(d.policy_version)} · Effective ${escapeHTML(d.effective_date)}</span></p><h2>1. Purpose</h2><p>This Service Policy explains how ${escapeHTML(d.company_name)} delivers AI consulting, automation implementation, support, and related services.</p><h2>2. Service Scope</h2><p>Services may include discovery, workflow analysis, AI automation design, implementation, testing, documentation, training, and support.</p><h2>3. Client Responsibilities</h2><p>Clients must provide timely access to required systems, accurate information, responsible decision makers, and feedback needed for delivery.</p><h2>4. Delivery Standards</h2><p>Eburon AI aims to deliver professional, secure, and measurable AI solutions with clear milestones and acceptance criteria.</p><h2>5. Support</h2><p>Support requests can be submitted to ${escapeHTML(d.contact_email)}.</p>`;
+  } else if(doc.id==="terms"){
+    content = `<h1>Terms & Conditions</h1><p><span class="doc-no">Version ${escapeHTML(d.policy_version)} · Effective ${escapeHTML(d.effective_date)}</span></p><h2>1. Applicability</h2><p>These Terms & Conditions apply to proposals, services, deliverables, support, and commercial engagements with ${escapeHTML(d.company_name)} unless replaced by a signed agreement.</p><h2>2. Fees and Payment</h2><p>Invoices must be paid according to the stated payment terms. Late payments may pause delivery or support obligations.</p><h2>3. Intellectual Property</h2><p>Pre-existing tools, frameworks, templates, methods, and know-how remain the property of their original owner.</p><h2>4. Liability</h2><p>Liability is limited to the amount paid for the relevant service unless mandatory law provides otherwise.</p><h2>5. Governing Law</h2><p>These terms are governed by ${escapeHTML(d.governing_law)}.</p>${signBlock(d,"Client")}`;
+  } else if(doc.id==="privacy"){
+    content = `<h1>Privacy Policy</h1><p><span class="doc-no">Version ${escapeHTML(d.policy_version)} · Effective ${escapeHTML(d.effective_date)}</span></p><h2>1. Controller</h2><p>${escapeHTML(d.company_name)} acts as data controller for personal data collected through business communications, websites, and service delivery unless otherwise stated.</p><h2>2. Data We Process</h2><p>We may process identification data, contact details, business communications, project information, technical logs, and billing details.</p><h2>3. Purposes</h2><p>Data is used to communicate, deliver services, manage contracts, invoice, improve security, and comply with legal obligations.</p><h2>4. Retention</h2><p>Personal data is retained only as long as necessary for the relevant purpose, contract, or legal obligation.</p><h2>5. Rights</h2><p>Data subjects may request access, correction, deletion, restriction, portability, or objection by contacting ${escapeHTML(d.dpo_email || d.contact_email)}.</p>`;
+  } else if(doc.id==="gdpr"){
+    content = `<h1>GDPR Compliance Statement</h1><p><span class="doc-no">Version ${escapeHTML(d.policy_version)} · Effective ${escapeHTML(d.effective_date)}</span></p><h2>1. Compliance Commitment</h2><p>${escapeHTML(d.company_name)} is committed to GDPR principles: lawfulness, fairness, transparency, purpose limitation, data minimization, accuracy, storage limitation, integrity, and confidentiality.</p><h2>2. Processor / Controller Roles</h2><p>Where services involve client data, the applicable agreement defines whether ${escapeHTML(d.processor_name)} acts as processor or controller.</p><h2>3. Security Measures</h2><p>Measures may include access control, encrypted storage/transmission where applicable, logging, least-privilege access, and supplier review.</p><h2>4. Data Subject Requests</h2><p>Requests are managed through ${escapeHTML(d.dpo_email || d.contact_email)} and handled within applicable legal timelines.</p><h2>5. Breach Handling</h2><p>Potential personal data breaches are assessed, documented, and escalated according to GDPR notification obligations.</p>${signBlock(d,"Compliance Owner")}`;
+  } else if(doc.id==="service-agreement"){
+    content = `<h1>Service Agreement</h1><p><span class="doc-no">${escapeHTML(d.agreement_no)}</span></p><div class="meta-grid"><div class="meta-box"><strong>Provider</strong><br>Eburon AI / Ariolas BV<br>${nl2br(d.company_address)}</div><div class="meta-box"><strong>Client</strong><br>${escapeHTML(d.client_company)}<br>${nl2br(d.client_address)}</div></div><h2>1. Scope of Services</h2><p>${nl2br(d.scope)}</p><h2>2. Term</h2><p>This Agreement starts on ${escapeHTML(d.effective_date)} and continues until ${escapeHTML(d.end_date)} unless terminated earlier.</p><h2>3. Fees</h2><p>The agreed service fee is ${money(d.fee)}. Payment terms: ${escapeHTML(d.payment_terms)}.</p><h2>4. Confidentiality</h2><p>Both parties agree to protect confidential information and use it only for the purposes of this Agreement.</p><h2>5. Deliverables and Acceptance</h2><p>Deliverables are accepted when they materially conform to the agreed scope or when the client uses them in production.</p>${signBlock(d,d.client_company)}`;
+  } else if(doc.id==="employment"){
+    content = `<h1>Employment Contract</h1><div class="meta-grid"><div class="meta-box"><strong>Employer</strong><br>Eburon AI / Ariolas BV<br>${nl2br(d.company_address)}</div><div class="meta-box"><strong>Employee</strong><br>${escapeHTML(d.employee_name)}<br>${nl2br(d.employee_address)}</div></div><h2>1. Position</h2><p>The employee is appointed as <strong>${escapeHTML(d.role_title)}</strong>.</p><h2>2. Start Date and Location</h2><p>Employment starts on ${escapeHTML(d.start_date)}. Work location: ${escapeHTML(d.work_location)}.</p><h2>3. Compensation</h2><p>Salary / compensation: ${escapeHTML(d.salary)}. Final compensation must be confirmed in the signed employment schedule.</p><h2>4. Duties</h2><p>The employee will perform duties reasonably associated with the role and support AI automation, client delivery, documentation, and internal operations.</p><h2>5. Confidentiality</h2><p>The employee must keep company, client, technical, commercial, and personal information confidential during and after employment.</p>${signBlock(d,d.employee_name)}`;
+  } else if(doc.id==="nda"){
+    content = `<h1>Non-Disclosure Agreement</h1><div class="meta-grid"><div class="meta-box"><strong>Disclosing / Receiving Party</strong><br>Eburon AI / Ariolas BV<br>${nl2br(d.company_address)}</div><div class="meta-box"><strong>Counterparty</strong><br>${escapeHTML(d.counterparty_name)}<br>${nl2br(d.counterparty_address)}</div></div><h2>1. Purpose</h2><p>${nl2br(d.purpose)}</p><h2>2. Confidential Information</h2><p>Confidential Information includes business, technical, financial, client, product, AI system, workflow, documentation, and strategic information shared in any form.</p><h2>3. Obligations</h2><p>The receiving party must protect Confidential Information, restrict access to authorized persons, and not use it outside the stated purpose.</p><h2>4. Term</h2><p>Confidentiality obligations remain in force for ${escapeHTML(d.confidentiality_term)} from the effective date unless a longer period applies by law.</p><h2>5. Return or Destruction</h2><p>Upon request, the receiving party must return or destroy Confidential Information except archival copies required by law or compliance obligations.</p>${signBlock(d,d.counterparty_name)}`;
+  } else if(doc.id==="freelancer"){
+    content = `<h1>Freelancer Agreement</h1><div class="meta-grid"><div class="meta-box"><strong>Client</strong><br>Eburon AI / Ariolas BV<br>${nl2br(d.company_address)}</div><div class="meta-box"><strong>Freelancer</strong><br>${escapeHTML(d.freelancer_name)}<br>${nl2br(d.freelancer_address)}</div></div><h2>1. Project</h2><p><strong>${escapeHTML(d.project_name)}</strong></p><h2>2. Deliverables</h2><p>${nl2br(d.deliverables)}</p><h2>3. Fees and Payment</h2><p>Fee: ${money(d.fee)}. Payment terms: ${escapeHTML(d.payment_terms)}.</p><h2>4. Independent Contractor</h2><p>The freelancer acts as an independent contractor and is responsible for applicable taxes, insurance, tools, and work methods unless otherwise agreed.</p><h2>5. Intellectual Property</h2><p>Upon full payment, project-specific deliverables are assigned to Eburon AI / Ariolas BV except pre-existing freelancer tools and materials.</p>${signBlock(d,d.freelancer_name)}`;
+  }
+  return wrapDoc(doc,d,content);
+}
+function toggleCodeMode(){
+  document.getElementById("previewShell").classList.toggle("code-mode");
+  document.getElementById("htmlCode").value = currentHTML;
+}
+function downloadCurrentDocument(){
+  const doc = getDoc();
+  const blob = new Blob([currentHTML],{type:"text/html;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = doc.id + ".html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function copyCurrentHTML(){
+  navigator.clipboard.writeText(currentHTML).then(()=>alert("Selected document HTML copied."));
+}
+function openPreviewWindow(){
+  const win = window.open("", "_blank");
+  win.document.open();
+  win.document.write(currentHTML);
+  win.document.close();
+}
+function printCurrentDocument(){
+  const win = window.open("", "_blank");
+  win.document.open();
+  win.document.write(currentHTML);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),400);
+}
+setDates();
+renderDocTiles();
+selectDoc("letterhead");
+</script>
+</body>
+</html>
