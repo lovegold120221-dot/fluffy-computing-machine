@@ -226,10 +226,6 @@ export class AudioStreamer {
       this.checkInterval = null;
     }
 
-    this.gainNode.gain.linearRampToValueAtTime(
-      0,
-      this.context.currentTime + 0.1
-    );
 
     setTimeout(() => {
       this.gainNode.gain.setValueAtTime(0, this.context.currentTime);

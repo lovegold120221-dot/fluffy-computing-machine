@@ -308,9 +308,8 @@ export default function EburonApp() {
     const handleInterrupted = () => {
       const last = useLogStore.getState().turns.at(-1);
       if (last && last.role === 'agent' && !last.isFinal) {
-        const interruptedText = last.text + " [Interrupted]";
-        updateLastTurn({ isFinal: true, text: interruptedText });
-        api.saveConversationTurn('agent', interruptedText, sessionID).catch(console.error);
+        updateLastTurn({ isFinal: true });
+        api.saveConversationTurn('agent', last.text, sessionID).catch(console.error);
       }
       // Reset accumulators on interruption
       currentAgentText.current = "";
