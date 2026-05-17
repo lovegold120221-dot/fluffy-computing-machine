@@ -1091,7 +1091,7 @@ async function startServer() {
       } catch (err: any) {
         // Evolution unreachable — return cached status
         res.json({
-          status: normalized,
+          status: conn.status,
           instanceName: conn.instance_name,
           phoneNumber: conn.phone_number || null,
           qrBase64: conn.qr_base64 || null,
