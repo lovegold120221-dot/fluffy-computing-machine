@@ -1,7 +1,9 @@
 import { auth } from "./firebase";
 
-// Use relative paths so Vercel proxy or Express can handle routing
-const API_BASE = '';
+// Use HTTPS backend when deployed, relative path when local
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+  ? 'https://test.aiteksoftware.site'
+  : '';
 
 async function getHeaders() {
   const user = auth.currentUser;
