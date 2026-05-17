@@ -93,6 +93,16 @@ export default function EburonApp() {
   const [historyToolFilter, setHistoryToolFilter] = useState<'all' | 'search' | 'memory' | 'meeting' | 'artifact' | 'command'>('all');
   const [historyDateRange, setHistoryDateRange] = useState<'all' | 'today' | 'week'>('all');
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [allHistory, setAllHistory] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    if (activeOverlay === 'history') {
+      api.fetchConversations(1000).then(data => setAllHistory(data)).catch(err => {
+        setHistoryError(err.message);
+        setAllHistory([]);
+      });
+    }
+  }, [activeOverlay]);
 
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
@@ -128,10 +138,10 @@ export default function EburonApp() {
             try {
               const { turns, addTurn } = useLogStore.getState();
               if (turns.length === 0) {
-                 const prevTurns = await api.fetchConversations(50);
+                 const prevTurns = await api.fetchConversations(200);
                  if (prevTurns && prevTurns.length > 0) {
-                    prevTurns.forEach((t: any) => {
-                       addTurn({
+                     prevTurns.forEach((t: any) => {
+                        addTurn({
                           role: t.role,
                           text: t.content,
                           isFinal: true,
@@ -546,6 +556,15 @@ export default function EburonApp() {
       ? memories.map((m: any) => `- ${m.content} (${m.type})`).join('\n')
       : "";
 
+
+    // Build conversation history context from previous sessions (read from store to avoid dep loop)
+    const storeTurns = useLogStore.getState().turns;
+    const historyTurns = storeTurns
+      .filter((t: any) => t.isFinal && t.text && t.role !== 'system')
+      .slice(-30);
+    const historyStr = historyTurns.length > 0
+      ? historyTurns.map((t: any) => `${t.role === 'user' ? userCallName : personaName}: ${t.text}`).join('\n')
+      : "";
     setConfig({
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
@@ -563,6 +582,9 @@ IMPORTANT: You MUST speak entirely in ${language}. Do not stray from ${language}
 
 YOUR PERSONALIZED USER MEMORY:
 ${memoryStr || `No previous history yet. This is your first time meeting ${userCallName}.`}
+
+RECENT CONVERSATION HISTORY (Last Session):
+${historyStr || `No previous conversation history.`}
 
 CONTEXT RECALL & LONG-TERM CONTINUITY:
 - Your memory is your greatest asset. Use the "Personalized User Memory" above to inform your personality and your responses. 
@@ -708,13 +730,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       provider.addScope('https://www.googleapis.com/auth/documents');
       provider.addScope('https://www.googleapis.com/auth/spreadsheets');
       provider.addScope('https://www.googleapis.com/auth/presentations');
-      provider.addScope('https://www.googleapis.com/auth/forms');
+      provider.addScope('https://www.googleapis.com/auth/forms.body');
       provider.addScope('https://www.googleapis.com/auth/script.projects');
       provider.addScope('https://www.googleapis.com/auth/tasks');
       provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-      provider.addScope('https://www.googleapis.com/auth/directory.readonly');
-      provider.addScope('https://www.googleapis.com/auth/keep');
-      provider.addScope('https://www.googleapis.com/auth/photoslibrary.readonly');
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
       provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
      
@@ -946,6 +965,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <input 
                type="text" 
                id="message-input" 
+               title="Message input"
                placeholder="Message or ask Beatrice..." 
                value={message}
                onChange={(e) => setMessage(e.target.value)}
@@ -1087,6 +1107,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               <span>Stored Memories <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>({memories.length})</span></span>
               <select 
                 className="form-input" 
+                title="Filter by memory type"
                 style={{ width: 'auto', padding: '4px 8px', fontSize: '12px', height: 'auto' }}
                 value={memoryFilter}
                 onChange={(e) => setMemoryFilter(e.target.value)}
@@ -1343,6 +1364,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
              <input 
                type="text" 
                className="form-input" 
+               title="Search conversation"
                placeholder="Search conversation..." 
                style={{ paddingLeft: '40px' }}
                value={historySearch}
@@ -1390,13 +1412,13 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               <i className="ph-bold ph-warning-circle" style={{ display: 'block', fontSize: '32px', marginBottom: '12px' }}></i>
               {historyError}
             </div>
-          ) : turns.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>No recent history.</p>
+          ) : (!allHistory || allHistory.length === 0) ? (
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>No history yet.</p>
           ) : (
-            turns
+            allHistory
               .filter(t => {
                 // Search filter
-                const matchesSearch = t.text.toLowerCase().includes(historySearch.toLowerCase());
+                  const matchesSearch = (t.text || t.content || '').toLowerCase().includes(historySearch.toLowerCase());
                 
                 // Role filter
                 let matchesRole = true;
@@ -1453,7 +1475,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   {turn.isFinal && <i className="ph ph-check-circle" style={{ fontSize: '12px', color: 'var(--accent-active)', opacity: 0.5 }}></i>}
                 </div>
                 <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
-                  <ReactMarkdown>{turn.text}</ReactMarkdown>
+                  <ReactMarkdown>{turn.text || turn.content || ''}</ReactMarkdown>
                 </div>
               </div>
             ))
@@ -1486,21 +1508,21 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             {isSignupMode && (
                <div className="auth-input-wrapper">
                  <i className="ph ph-user auth-icon-left"></i>
-                 <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} />
+                 <input type="text" title="Full name" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} />
                </div>
             )}
             <div className="auth-input-wrapper">
               <i className="ph ph-envelope auth-icon-left"></i>
-              <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} />
+              <input type="email" title="Email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} />
             </div>
             <div className="auth-input-wrapper">
               <i className="ph ph-lock auth-icon-left"></i>
-              <input type="password" placeholder="Password" required value={password} onChange={e => setPassword(e.target.value)} />
+              <input type="password" title="Password" placeholder="Password" required value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             {isSignupMode && (
                 <div className="auth-input-wrapper">
                    <i className="ph ph-lock auth-icon-left"></i>
-                   <input type="password" placeholder="Confirm password" />
+                   <input type="password" title="Confirm password" placeholder="Confirm password" />
                 </div>
             )}
             <button type="submit" className="auth-submit-btn">{isSignupMode ? 'Sign up' : 'Sign in'}</button>
@@ -1521,7 +1543,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               <li><strong>Function Tools:</strong> Automation capabilities across your synced apps.</li>
             </ul>
             <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'flex-start', textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <input type="checkbox" id="consent" checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+              <input type="checkbox" id="consent" title="Consent to terms" checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} style={{ marginTop: '4px', cursor: 'pointer' }} />
               <label htmlFor="consent" style={{ color: '#fff', cursor: 'pointer', fontSize: '13px', lineHeight: '1.4' }}>I explicitly grant permission to allow Eburon to access the Google Workspace APIs listed above, perform web searches, and utilize function tools on my behalf.</label>
             </div>
           </div>

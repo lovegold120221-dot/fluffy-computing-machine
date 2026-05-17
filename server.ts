@@ -294,7 +294,7 @@ async function startServer() {
     }
   });
 
-  // Conversations (vep_chat_messages schema)
+  // Conversations (user_conversations schema)
   app.get("/api/conversations", authenticateToken, async (req: any, res) => {
     try {
       if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
@@ -302,22 +302,22 @@ async function startServer() {
       const { limit = 100 } = req.query;
 
       const { data, error } = await supabase
-        .from("vep_chat_messages")
+        .from("user_conversations")
         .select("*")
-        .eq("firebase_uid", uid)
-        .order("message_timestamp", { ascending: false })
+        .eq("uid", uid)
+        .order("created_at", { ascending: true })
         .limit(Number(limit));
 
       if (error) {
         if (error.code === 'PGRST116' || error.message.includes('cache')) {
           return res.status(503).json({
-            error: "vep_chat_messages table is missing. Please run the SQL in SCHEMA.sql in your Supabase SQL Editor.",
+            error: "user_conversations table is missing. Please run the SQL in SCHEMA.sql in your Supabase SQL Editor.",
             setupRequired: true
           });
         }
         throw error;
       }
-      res.json(data ? data.reverse() : []);
+      res.json(data || []);
     } catch (err: any) {
       console.error("Fetch conversations error:", err.message);
       res.status(500).json({ error: err.message });
@@ -328,31 +328,27 @@ async function startServer() {
     try {
       if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
       const { uid } = req.user;
-      const { role, content, session_id, speaker, text, file_name, file_type, file_data_url, tool_name, tool_result } = req.body;
+      const { role, content, session_id } = req.body;
 
       if (!role || !content) {
         return res.status(400).json({ error: "Missing role or content" });
       }
 
       const { data, error } = await supabase
-        .from("vep_chat_messages")
+        .from("user_conversations")
         .insert({
-          firebase_uid: uid,
-          role: role === 'agent' ? 'model' : role,
-          source: session_id || null,
-          speaker: speaker || null,
-          text: content,
-          message_timestamp: new Date().toISOString(),
-          file_name: file_name || null,
-          file_type: file_type || null,
-          metadata: tool_name ? { tool_name, tool_result } : {},
+          uid,
+          role,
+          content,
+          session_id: session_id || null,
+          created_at: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (error) {
         if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          console.warn("Skipping conversation sync: vep_chat_messages table missing.");
+          console.warn("Skipping conversation sync: user_conversations table missing.");
           return res.status(204).send();
         }
         throw error;
