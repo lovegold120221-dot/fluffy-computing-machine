@@ -339,13 +339,12 @@ async function startServer() {
         .insert({
           firebase_uid: uid,
           role: role === 'agent' ? 'model' : role,
-          source: session_id || undefined,
-          speaker: speaker || undefined,
+          source: session_id || null,
+          speaker: speaker || null,
           text: content,
           message_timestamp: new Date().toISOString(),
-          file_name: file_name || undefined,
-          file_type: file_type || undefined,
-          file_data_url: file_data_url || undefined,
+          file_name: file_name || null,
+          file_type: file_type || null,
           metadata: tool_name ? { tool_name, tool_result } : {},
         })
         .select()
