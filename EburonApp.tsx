@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveAPIContext } from './contexts/LiveAPIContext';
 import { useLogStore, useTools, useSettings, useUI } from './lib/state';
 import { AudioRecorder } from './lib/audio-recorder';
@@ -890,11 +890,11 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     }
   };
 
-  function startScreenShare(event: MouseEvent<HTMLButtonElement, MouseEvent>): void {
+  function startScreenShare(event: any): void {
     throw new Error('Function not implemented.');
   }
 
-  function startWebcam(event: MouseEvent<HTMLButtonElement, MouseEvent>): void {
+  function startWebcam(event: any): void {
     throw new Error('Function not implemented.');
   }
 
@@ -903,7 +903,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       {/* Header */}
       <header className="header">
         <div className="header-left">
-          <img src="https://eburon.ai/icon-eburon.svg" alt="Eburon Logo" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+          <div className="logo-icon"><img src="https://eburon.ai/icon-eburon.svg" alt="Eburon Logo" /></div>
           <span className="ai-name">Eburon AI</span>
         </div>
 
@@ -1504,8 +1504,8 @@ Output only natural spoken text. No stage directions, no brackets, no role label
 
             // Sort sessions by newest first
             const sortedSessions = Array.from(sessions.entries()).sort((a, b) => {
-              const aTime = new Date(a.value[0].message_timestamp || a.value[0].created_at).getTime();
-              const bTime = new Date(b.value[0].message_timestamp || b.value[0].created_at).getTime();
+              const aTime = new Date(a[1][0].message_timestamp || a[1][0].created_at).getTime();
+              const bTime = new Date(b[1][0].message_timestamp || b[1][0].created_at).getTime();
               return bTime - aTime;
             });
 

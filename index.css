@@ -57,7 +57,13 @@
       display: flex; align-items: center; background-color: var(--bg-chip);
       padding: 8px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;
       flex-shrink: 0;
+      gap: 8px;
     }
+    .logo-icon {
+      display: grid; place-items: center; width: 32px; height: 32px;
+      border-radius: 50%; background: var(--accent-primary); overflow: hidden;
+    }
+    .logo-icon img { width: 18px; height: 18px; display: block; }
     .header-left .ai-name { display: none; }
     @media (min-width: 480px) { .header-left .ai-name { display: inline; } }
 
