@@ -57,13 +57,13 @@ export default function EburonApp() {
       bgAudioRef.current.pause();
     } else if (!isSpeaking && geminiAudioActiveRef.current && bgAudioRef.current && connected) {
       geminiAudioActiveRef.current = false;
-      bgAudioRef.current.play().catch(() => {});
+      bgAudioRef.current.play().catch(() => { });
     }
   }, [volume, connected]);
 
   useEffect(() => {
     if (bgAudioRef.current) {
-    bgAudioRef.current.volume = 0.45;
+      bgAudioRef.current.volume = 0.45;
       if (connected) {
         bgAudioRef.current.play().catch(err => console.log("Bg audio play blocked until interaction:", err));
       } else {
@@ -817,7 +817,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         'drive': 'Find the latest project files in my Google Drive.',
         'google': 'Run a quick Google search on recent tech news.',
         'signature': 'Prepare a non-disclosure agreement for signature.',
-        'company': 'Look up the company registration details for Acme Corp.',
+        'company': 'Look up the company registration details for Ariolas BV.',
         'proposal': 'Draft a business proposal for a new client.',
         'gmail': 'Check my inbox for unread emails from the team.',
         'sheets': 'Create a new expense tracking spreadsheet.',
