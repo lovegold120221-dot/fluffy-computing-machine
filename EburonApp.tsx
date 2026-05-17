@@ -1102,13 +1102,13 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <button className={`nav-item ${micState ? 'active' : ''}`} onClick={() => setMicState(!micState)}>
             <div className="icon-wrapper">
               <div className="icon-pulse" style={{
-                width: micState ? `${28 + clientVolume * 30}px` : '0px',
-                height: micState ? `${28 + clientVolume * 30}px` : '0px',
+                width: micState ? `${36 + clientVolume * 40}px` : '0px',
+                height: micState ? `${36 + clientVolume * 40}px` : '0px',
                 opacity: micState && clientVolume > 0.01 ? 0.3 : 0
               }}></div>
               <div className="icon-pulse-ring" style={{
-                width: micState ? `${32 + clientVolume * 50}px` : '0px',
-                height: micState ? `${32 + clientVolume * 50}px` : '0px',
+                width: micState ? `${42 + clientVolume * 65}px` : '0px',
+                height: micState ? `${42 + clientVolume * 65}px` : '0px',
                 opacity: micState && clientVolume > 0.01 ? 0.5 : 0
               }}></div>
               <i className={`ph-fill ph-microphone${micState ? '' : '-slash'}`}></i>
