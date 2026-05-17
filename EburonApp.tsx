@@ -761,14 +761,12 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/youtube');
     provider.addScope('https://www.googleapis.com/auth/youtube.upload');
     provider.addScope('https://www.googleapis.com/auth/youtubepartner');
-    // Maps, Places, Geocoding, Directions
-    provider.addScope('https://www.googleapis.com/auth/maps');
+    // Places
     provider.addScope('https://www.googleapis.com/auth/places');
     // Firebase & GCP Backend
     provider.addScope('https://www.googleapis.com/auth/firebase');
     provider.addScope('https://www.googleapis.com/auth/firebase.messaging');
     provider.addScope('https://www.googleapis.com/auth/firebase.database');
-    provider.addScope('https://www.googleapis.com/auth/firestore');
     provider.addScope('https://www.googleapis.com/auth/devstorage.read_write');
     provider.addScope('https://www.googleapis.com/auth/pubsub');
     provider.addScope('https://www.googleapis.com/auth/cloudfunctions');
