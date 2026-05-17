@@ -1678,9 +1678,17 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <div style={{ display: "flex", alignItems: "center", gap: "4px", fontWeight: 500, color: "#aaa" }}>
               <i className="ph-fill ph-shield-check" style={{ color: "var(--accent-active)" }}></i> Permissions
             </div>
-            <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "flex-start", textAlign: "left", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+            <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "12px", textAlign: "left", fontSize: "12px", lineHeight: "1.6" }}>
+              <div style={{ color: "#888" }}>By continuing with Google, Eburon will access:</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {["Gmail","Drive","Calendar","Docs","Sheets","Slides","Forms","Tasks","Contacts","Directory","YouTube","Chat","Apps Script","Profile","Firebase","Google Cloud"].map(s => (
+                  <span key={s} style={{ background: "rgba(203,251,69,0.08)", border: "1px solid rgba(203,251,69,0.15)", borderRadius: "999px", padding: "3px 10px", color: "#cbfb45", fontWeight: 600, fontSize: "11px" }}>{s}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginTop: "10px", display: "flex", gap: "8px", alignItems: "flex-start", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
               <input type="checkbox" id="consent" style={{ marginTop: "4px", cursor: "pointer" }} checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} />
-              <label htmlFor="consent" style={{ color: "#fff", cursor: "pointer", fontSize: "13px", lineHeight: "1.4" }}>I grant Eburon permission to access my connected Google accounts and use automation tools on my behalf.</label>
+              <label htmlFor="consent" style={{ color: "#fff", cursor: "pointer", fontSize: "13px", lineHeight: "1.4" }}>I grant permission for the above.</label>
             </div>
           </div>
         </div>
