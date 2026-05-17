@@ -699,15 +699,24 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         setAuthError('You must explicitly agree to the permissions before continuing with Google.');
         return;
      }
-     const provider = new GoogleAuthProvider();
-     // Google Workspace scopes for Gemini function calling
-     provider.addScope('https://www.googleapis.com/auth/calendar');
-     provider.addScope('https://www.googleapis.com/auth/gmail.modify');
-     provider.addScope('https://www.googleapis.com/auth/drive');
-     provider.addScope('https://www.googleapis.com/auth/tasks');
-     provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-     provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-     provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/calendar');
+      provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+      provider.addScope('https://www.googleapis.com/auth/gmail.compose');
+      provider.addScope('https://www.googleapis.com/auth/drive');
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
+      provider.addScope('https://www.googleapis.com/auth/documents');
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+      provider.addScope('https://www.googleapis.com/auth/presentations');
+      provider.addScope('https://www.googleapis.com/auth/forms');
+      provider.addScope('https://www.googleapis.com/auth/script.projects');
+      provider.addScope('https://www.googleapis.com/auth/tasks');
+      provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
+      provider.addScope('https://www.googleapis.com/auth/directory.readonly');
+      provider.addScope('https://www.googleapis.com/auth/keep');
+      provider.addScope('https://www.googleapis.com/auth/photoslibrary.readonly');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
      
      try {
         const result = await signInWithPopup(auth, provider);
@@ -1507,7 +1516,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <div className="permissions-note">
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: '#aaa' }}><i className="ph-fill ph-shield-check" style={{color: 'var(--accent-active)'}}></i> Authorization & Capabilities</span>
             <ul style={{ margin: 0, paddingLeft: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <li><strong>Google Workspace:</strong> Access to Gmail, Drive, Calendar, Contacts, and Tasks.</li>
+              <li><strong>Google Workspace:</strong> Full access to Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Tasks, Contacts, Directory, Keep, Google Photos, and Apps Script.</li>
               <li><strong>Live Web Search:</strong> Real-time Google Search access.</li>
               <li><strong>Function Tools:</strong> Automation capabilities across your synced apps.</li>
             </ul>
