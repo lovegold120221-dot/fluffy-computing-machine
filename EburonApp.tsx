@@ -43,10 +43,23 @@ export default function EburonApp() {
   const [clientVolume, setClientVolume] = useState(0);
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [activeTasks, setActiveTasks] = useState<Array<{ taskId: string; description: string; status: string }>>([]);
+  const geminiAudioActiveRef = useRef(false);
 
   const { stream, videoRef, isWebcamActive, isScreenShareActive, facingMode, flipCamera, stopStream, isRecording, recordingPaused, startRecording, togglePauseRecording, takeSnapshot } = useVideoStream();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgAudioRef = useRef<HTMLAudioElement>(null);
+
+  // Pause bg audio when Gemini AI is speaking; resume when it stops
+  useEffect(() => {
+    const isSpeaking = volume > 0.01;
+    if (isSpeaking && !geminiAudioActiveRef.current && bgAudioRef.current) {
+      geminiAudioActiveRef.current = true;
+      bgAudioRef.current.pause();
+    } else if (!isSpeaking && geminiAudioActiveRef.current && bgAudioRef.current && connected) {
+      geminiAudioActiveRef.current = false;
+      bgAudioRef.current.play().catch(() => {});
+    }
+  }, [volume, connected]);
 
   useEffect(() => {
     if (bgAudioRef.current) {
@@ -761,8 +774,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/youtube');
     provider.addScope('https://www.googleapis.com/auth/youtube.upload');
     provider.addScope('https://www.googleapis.com/auth/youtubepartner');
-    // Places
-    provider.addScope('https://www.googleapis.com/auth/places');
     // Firebase & GCP Backend
     provider.addScope('https://www.googleapis.com/auth/firebase');
     provider.addScope('https://www.googleapis.com/auth/firebase.messaging');
@@ -1700,4 +1711,30 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       )}
     </div>
   );
+}
+
+
+// Hook to enumerate and set audio output device
+export function useAudioOutputDevice() {
+  const [deviceId, setDeviceId] = useState<string>('');
+
+  const enumerateDevices = useCallback(async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === 'audiooutput');
+  }, []);
+
+  const setOutputDevice = useCallback(async (id: string) => {
+    try {
+      const ctx = await import('@/lib/utils').then(m => m.audioContext({ id: 'audio-out' }));
+      // Set the default sink for the AudioContext's destination
+      if ('setSinkId' in ctx.destination) {
+        await (ctx.destination as any).setSinkId(id);
+        setDeviceId(id);
+      }
+    } catch (e) {
+      console.error('Failed to set audio output device:', e);
+    }
+  }, []);
+
+  return { deviceId, setOutputDevice, enumerateDevices };
 }
