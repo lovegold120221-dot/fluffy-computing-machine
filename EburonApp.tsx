@@ -1784,7 +1784,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{(f.size / 1024).toFixed(1)} KB &bull; {f.content.length.toLocaleString()} chars</div>
                 </div>
               </div>
-              <button onClick={() => setKbFiles(prev => prev.filter((_, idx) => idx !== i))} style={{
+              <button title="Remove file" onClick={() => setKbFiles(prev => prev.filter((_, idx) => idx !== i))} style={{
                 background: 'none', border: 'none', color: 'var(--accent-danger)', cursor: 'pointer', fontSize: '18px', padding: '4px'
               }}><i className="ph-bold ph-trash"></i></button>
             </div>
