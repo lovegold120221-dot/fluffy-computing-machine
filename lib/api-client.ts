@@ -216,3 +216,73 @@ export async function fetchActiveTasks() {
   }
   return res.json();
 }
+
+export async function createAutomation(input: {
+  title: string;
+  description: string;
+  schedule: { type: string; time?: string; timezone?: string };
+  agent?: string;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+}) {
+  const headers = await getHeaders();
+  const res = await fetch("/api/automations", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to create automation"));
+  return res.json();
+}
+
+export async function fetchAutomations() {
+  const headers = await getHeaders();
+  const res = await fetch("/api/automations", { headers });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automations"));
+  return res.json();
+}
+
+export async function fetchAutomation(id: string) {
+  const headers = await getHeaders();
+  const res = await fetch(`/api/automations/${id}`, { headers });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automation"));
+  return res.json();
+}
+
+export async function updateAutomation(id: string, updates: Record<string, any>) {
+  const headers = await getHeaders();
+  const res = await fetch(`/api/automations/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to update automation"));
+  return res.json();
+}
+
+export async function deleteAutomation(id: string) {
+  const headers = await getHeaders();
+  const res = await fetch(`/api/automations/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to delete automation"));
+  return res.json();
+}
+
+export async function runAutomationNow(id: string) {
+  const headers = await getHeaders();
+  const res = await fetch(`/api/automations/${id}/run`, {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to run automation"));
+  return res.json();
+}
+
+export async function fetchAutomationRuns(id: string) {
+  const headers = await getHeaders();
+  const res = await fetch(`/api/automations/${id}/runs`, { headers });
+  if (!res.ok) throw new Error(await readApiError(res, "Failed to fetch automation runs"));
+  return res.json();
+}

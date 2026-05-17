@@ -59,8 +59,8 @@
       flex-shrink: 0; height: 40px;
     }
     .logo-icon img { height: 20px; display: block; }
-    .header-left .ai-name { font-size: 14px; font-weight: 600; display: none; }
-    @media (min-width: 480px) { .header-left .ai-name { display: inline; } }
+     .header-left .ai-name { font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+    
 
     .header-center {
       display: flex; align-items: center; justify-content: center;
@@ -439,3 +439,27 @@
         max-height: 60vh;
       }
     }
+.error-screen {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  text-align: center;
+  padding: 20px;
+  color: #fff;
+}
+
+.close-button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: var(--accent-primary);
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}

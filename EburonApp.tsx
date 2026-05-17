@@ -10,6 +10,7 @@ import { auth, testConnection } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import * as api from './lib/api-client';
 import { useAuth } from './lib/state';
+import AutomationPanel from './components/AutomationPanel';
 
 
 export default function EburonApp() {
@@ -453,6 +454,62 @@ export default function EburonApp() {
             }
           }
 
+          if (fc.name === 'create_automation') {
+            try {
+              const result = await api.createAutomation({
+                title: fc.args.title,
+                description: fc.args.description,
+                schedule: {
+                  type: fc.args.scheduleType,
+                  time: fc.args.time,
+                  timezone: fc.args.timezone || 'Europe/Brussels',
+                },
+                output: { format: fc.args.outputFormat || 'summary' },
+              });
+              return { id: fc.id, response: result };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'list_automations') {
+            try {
+              const result = await api.fetchAutomations();
+              return { id: fc.id, response: { automations: result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { automations: [], error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'run_automation_now') {
+            try {
+              const result = await api.runAutomationNow(fc.args.automationId);
+              return { id: fc.id, response: result };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'pause_automation') {
+            try {
+              const result = await api.updateAutomation(fc.args.automationId, {
+                status: fc.args.paused ? 'paused' : 'active',
+              });
+              return { id: fc.id, response: result };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
+          if (fc.name === 'check_automation_runs') {
+            try {
+              const result = await api.fetchAutomationRuns(fc.args.automationId);
+              return { id: fc.id, response: { runs: result } };
+            } catch (err: any) {
+              return { id: fc.id, response: { runs: [], error: err.message || String(err) } };
+            }
+          }
+
           const genericResponses: Record<string, any> = {
             'schedule_meeting': { status: 'Meeting scheduled successfully.' },
             'execute_voice_command': { status: 'Command executed.' },
@@ -651,6 +708,13 @@ IMPORTANT: When generating documents or artifacts, ALWAYS verbalize that you are
 - Use "run_vps_subagents" to dispatch architect/builder/reviewer style sub-agents through VPS Ollama.
 - Use "run_background_task" for any complex, long-running, or autonomous work. This delegates the task to a background worker so you can keep talking to the Boss without delay. Examples: generating a full report, running complex CLI tools, building something on the server, bulk file processing. You'll get a task ID back — say something natural like "I've kicked that off, give me a moment" or "Let me check on that in the background." When the Boss asks for an update, use "check_background_tasks" to see what's still running, and report the progress in natural, client-facing language — never read the raw logs.
 - Use "check_background_tasks" to see what tasks are still running in the background. Convert the status into natural speech — say things like "Still working on those file conversions..." or "Almost done with the report generation." Never expose raw logs or technical details to the Boss.
+- HERMES AUTOMATION TOOLS — Use these for recurring, scheduled, or long-running workflows only. NOT for simple one-off commands.
+  * Use "create_automation" when the user asks for a recurring/scheduled task like "every morning give me a business report" or "run a weekly inventory summary." Beatrice should say "I'll set that up as a scheduled workflow" and let the automation handle it.
+  * Use "list_automations" to show all active automations when asked "what automations do I have running."
+  * Use "run_automation_now" to trigger an immediate run of a scheduled automation (e.g., "run the report now").
+  * Use "pause_automation" to pause or resume an automation (e.g., "pause the daily report").
+  * Use "check_automation_runs" to check the run history of a specific automation.
+  When creating automations, ask the user about schedule (daily/weekly/monthly), preferred time, and what output they want. Say things like "I'll have Hermes run that every morning at 8 AM" and report results like "Your daily report is ready."
 
 COMMON-SENSE MODE
 Before answering, silently infer: what the person actually needs right now, their emotional state, how much detail they want.
@@ -808,7 +872,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
   };
 
   const handleToolAction = (toolId: string) => {
-    if (['history', 'tools', 'profile', 'settings'].includes(toolId)) {
+    if (['history', 'tools', 'profile', 'settings', 'automation'].includes(toolId)) {
       setActiveOverlay(toolId);
     } else {
       const prompts: Record<string, string> = {
@@ -904,7 +968,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       <header className="header">
         <div className="header-left">
           <div className="logo-icon"><img src="https://eburon.ai/icon-eburon.svg" alt="Eburon Logo" /></div>
-          <span className="ai-name">Eburon AI</span>
+          <span className="ai-name">Eburon</span>
         </div>
 
         <div className="header-center">
@@ -988,6 +1052,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <div className="skills-track">
             <div className="skill-chip" onClick={() => handleToolAction('settings')}><div className="skill-glyph bg-settings"><i className="ph-duotone ph-gear"></i></div><span className="skill-label">Settings</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('tools')}><div className="skill-glyph bg-tools"><i className="ph-duotone ph-wrench"></i></div><span className="skill-label">Tools</span></div>
+            <div className="skill-chip" onClick={() => handleToolAction('automation')}><div className="skill-glyph" style={{background: 'rgba(203,251,69,0.12)'}}><i className="ph-duotone ph-robot" style={{color: 'var(--accent-active)'}}></i></div><span className="skill-label">Automation</span></div>
 
             <div className="skill-chip" onClick={() => handleToolAction('history')}><div className="skill-glyph bg-history"><i className="ph-duotone ph-clock-counter-clockwise"></i></div><span className="skill-label">History</span></div>
             <div className="skill-chip" onClick={() => handleToolAction('proposal')}><div className="skill-glyph bg-proposal"><i className="ph-duotone ph-presentation-chart"></i></div><span className="skill-label">Proposal</span></div>
@@ -1497,7 +1562,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             // Group by session (source field)
             const sessions = new Map<string, any[]>();
             for (const t of filtered) {
-              const sid = t.source || `session-${new Date(t.message_timestamp || t.created_at).toDateString()}`;
+              const sid = t.session_id || `session-${new Date(t.message_timestamp || t.created_at).toDateString()}`;
               if (!sessions.has(sid)) sessions.set(sid, []);
               sessions.get(sid)!.push(t);
             }
@@ -1543,6 +1608,17 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               );
             });
           })()}
+        </div>
+      </div>
+
+      {/* Automation Overlay */}
+      <div id="overlay-automation" className={`full-page-overlay ${activeOverlay === 'automation' ? 'active' : ''}`}>
+        <div className="overlay-header">
+          <div className="overlay-title"><i className="ph-fill ph-robot" style={{color:'var(--accent-active)', marginRight:'8px'}}></i>Automations</div>
+          <button className="close-overlay-btn" title="Close automations" onClick={() => setActiveOverlay(null)}><i className="ph-bold ph-x"></i></button>
+        </div>
+        <div className="overlay-content" style={{ overflowY: 'auto' }}>
+          <AutomationPanel />
         </div>
       </div>
 
@@ -1599,25 +1675,20 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           </button>
 
           <div className="permissions-note">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: '#aaa' }}><i className="ph-fill ph-shield-check" style={{ color: 'var(--accent-active)' }}></i> Authorization & Capabilities</span>
-            <ul style={{ margin: 0, paddingLeft: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <li><strong>Google Workspace:</strong> Full access to Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Tasks, Contacts, Directory, Keep, Google Photos, and Apps Script.</li>
-              <li><strong>Live Web Search:</strong> Real-time Google Search access.</li>
-              <li><strong>Function Tools:</strong> Automation capabilities across your synced apps.</li>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", fontWeight: 500, color: "#aaa" }}>
+              <i className="ph-fill ph-shield-check" style={{ color: "var(--accent-active)" }}></i> Authorization & Full Capabilities
+            </div>
+            <ul style={{ margin: 0, paddingLeft: "16px", textAlign: "left", display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+              <li><strong style={{ color: "#fff" }}>Google Workspace:</strong> Full read/write access to Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Tasks, Contacts, Directory, Keep, and Google Photos.</li>
+              <li><strong style={{ color: "#fff" }}>Live Web Search:</strong> Real-time unrestricted Google Search access for grounded reasoning.</li>
+              <li><strong style={{ color: "#fff" }}>Function Tools:</strong> Full automation capabilities across all synced Google services.</li>
+              <li><strong style={{ color: "#fff" }}>Identity:</strong> Verified Google Profile and secure authentication.</li>
             </ul>
-            <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'flex-start', textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <input type="checkbox" id="consent" title="Consent to terms" checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} style={{ marginTop: '4px', cursor: 'pointer' }} />
-              <label htmlFor="consent" style={{ color: '#fff', cursor: 'pointer', fontSize: '13px', lineHeight: '1.4' }}>I explicitly grant permission to allow Eburon to access the Google Workspace APIs listed above, perform web searches, and utilize function tools on my behalf.</label>
+            <div style={{ marginTop: "12px", display: "flex", gap: "8px", alignItems: "flex-start", textAlign: "left", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+              <input type="checkbox" id="consent" style={{ marginTop: "4px", cursor: "pointer" }} checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} />
+              <label htmlFor="consent" style={{ color: "#fff", cursor: "pointer", fontSize: "13px", lineHeight: "1.4" }}>I explicitly grant Eburon full permission to access my Google Workspace APIs, perform web searches, and utilize function tools on my behalf to automate my professional and personal life.</label>
             </div>
           </div>
-
-          <div className="auth-toggle">
-            {isSignupMode ? 'Back to ' : 'Don\'t have an account? '}
-            <span onClick={() => setIsSignupMode(!isSignupMode)}>
-              {isSignupMode ? 'Sign in' : 'Sign up'}
-            </span>
-          </div>
-
         </div>
       </div>
 

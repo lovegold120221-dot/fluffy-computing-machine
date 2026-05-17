@@ -52,7 +52,7 @@ export function useLiveApi({
 
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
-  const [config, setConfig] = useState<LiveConnectConfig>({});
+  const [config, setConfig] = useState<LiveConnectConfig>({ generationConfig: { speechConfig: { voiceConfig: { preamble: "You are an ultra-natural human-like assistant. Do not stop abruptly. Allow for natural pauses in conversation. Be fluid and avoid robotic cuts." } } } });
 
   useEffect(() => {
     let isCancelled = false;

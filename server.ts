@@ -21,6 +21,16 @@ import {
   getTaskStatus,
   getActiveTasks,
 } from "./lib/server/worker-engine";
+import {
+  createAutomation,
+  getAutomations,
+  getAutomation,
+  updateAutomation,
+  deleteAutomation,
+  runAutomationNow,
+  getAutomationRuns,
+  loadAndScheduleAll,
+} from "./lib/server/automation-engine";
 
 dotenv.config();
 dotenv.config({ path: '.env.local' });
@@ -565,6 +575,104 @@ async function startServer() {
       res.status(500).json({ error: String(err) });
     }
   });
+
+  // Automation CRUD routes
+  const createAutomationSchema = z.object({
+    title: z.string().min(1).max(200),
+    description: z.string().min(1),
+    schedule: z.object({
+      type: z.enum(["once", "daily", "weekly", "monthly"]),
+      time: z.string().optional(),
+      timezone: z.string().optional(),
+    }),
+    agent: z.string().optional(),
+    input: z.record(z.any()).optional(),
+    output: z.record(z.any()).optional(),
+  });
+
+  const updateAutomationSchema = z.object({
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().min(1).optional(),
+    schedule: z.object({
+      type: z.enum(["once", "daily", "weekly", "monthly"]),
+      time: z.string().optional(),
+      timezone: z.string().optional(),
+    }).optional(),
+    status: z.enum(["active", "paused"]).optional(),
+    input: z.record(z.any()).optional(),
+    output: z.record(z.any()).optional(),
+  });
+
+  app.post("/api/automations", authenticateToken, async (req: any, res) => {
+    const body = parseRequest(createAutomationSchema, req.body, res);
+    if (!body) return;
+    try {
+      const result = await createAutomation({ uid: req.user.uid, ...body });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.get("/api/automations", authenticateToken, async (req: any, res) => {
+    try {
+      const result = await getAutomations(req.user.uid);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.get("/api/automations/:id", authenticateToken, async (req: any, res) => {
+    try {
+      const result = await getAutomation(req.params.id, req.user.uid);
+      if (!result) return res.status(404).json({ error: "Not found" });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.patch("/api/automations/:id", authenticateToken, async (req: any, res) => {
+    const body = parseRequest(updateAutomationSchema, req.body, res);
+    if (!body) return;
+    try {
+      const result = await updateAutomation(req.params.id, req.user.uid, body);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.delete("/api/automations/:id", authenticateToken, async (req: any, res) => {
+    try {
+      await deleteAutomation(req.params.id, req.user.uid);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.post("/api/automations/:id/run", authenticateToken, async (req: any, res) => {
+    try {
+      const result = await runAutomationNow(req.params.id, req.user.uid);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  app.get("/api/automations/:id/runs", authenticateToken, async (req: any, res) => {
+    try {
+      const result = await getAutomationRuns(req.params.id, req.user.uid);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  // Load scheduled automations on startup
+  loadAndScheduleAll();
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

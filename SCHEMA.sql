@@ -363,3 +363,34 @@ CREATE TABLE IF NOT EXISTS user_conversations (
 
 -- If you weren't using a Service Role Key, you would need complex custom JWT mapping 
 -- to make auth.uid() match Firebase IDs. For now, your server handles this security.
+
+-- 5. Automations Table (Hermes scheduled workflows)
+CREATE TABLE IF NOT EXISTS automations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uid TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  agent TEXT NOT NULL DEFAULT 'hermes',
+  schedule JSONB NOT NULL,
+  input JSONB DEFAULT '{}',
+  output JSONB DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'active',
+  last_run_at TIMESTAMPTZ,
+  next_run_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 6. Automation Runs Table
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  automation_id UUID REFERENCES automations(id) ON DELETE CASCADE,
+  uid TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  result JSONB,
+  logs JSONB DEFAULT '[]',
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

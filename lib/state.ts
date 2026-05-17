@@ -430,6 +430,71 @@ export const workspaceTools: FunctionCall[] = [
       properties: {}
     }
   },
+  {
+    name: "create_automation",
+    description: "Creates a recurring or scheduled Hermes automation workflow for long-running business tasks, reports, monitoring, or background work. Use this for: daily/weekly/monthly reports, recurring business summaries, inventory status, scheduled research, or any repetitive task. NOT for simple one-off commands.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        title: { type: "STRING", description: "Short title for the automation." },
+        description: { type: "STRING", description: "Detailed workflow instruction for Hermes." },
+        scheduleType: { type: "STRING", enum: ["once", "daily", "weekly", "monthly"], description: "How often the automation should run." },
+        time: { type: "STRING", description: "Preferred run time, e.g. 08:00." },
+        timezone: { type: "STRING", description: "Timezone, default Europe/Brussels." },
+        outputFormat: { type: "STRING", enum: ["summary", "report", "document", "dashboard_update"], description: "Desired output format." }
+      },
+      required: ["title", "description", "scheduleType"]
+    }
+  },
+  {
+    name: "list_automations",
+    description: "Lists all scheduled Hermes automation workflows for the user. Returns status, schedule, last run, and next run for each.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: { type: "OBJECT", properties: {} }
+  },
+  {
+    name: "run_automation_now",
+    description: "Triggers an immediate run of a scheduled Hermes automation workflow. Use when the user asks to run a report or workflow right now.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        automationId: { type: "STRING", description: "The automation ID to run immediately." }
+      },
+      required: ["automationId"]
+    }
+  },
+  {
+    name: "pause_automation",
+    description: "Pauses or resumes a scheduled Hermes automation workflow without deleting it.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        automationId: { type: "STRING", description: "The automation ID to pause or resume." },
+        paused: { type: "BOOLEAN", description: "Set true to pause, false to resume." }
+      },
+      required: ["automationId", "paused"]
+    }
+  },
+  {
+    name: "check_automation_runs",
+    description: "Checks the run history of a specific automation workflow. Returns recent runs with status, timestamps, and result summaries.",
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        automationId: { type: "STRING", description: "The automation ID to check runs for." }
+      },
+      required: ["automationId"]
+    }
+  },
 ];
 
 export type Template = 'customer-support' | 'personal-assistant' | 'navigation-system';
