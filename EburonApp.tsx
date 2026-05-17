@@ -118,6 +118,7 @@ export default function EburonApp() {
   const [memorySuccessMsg, setMemorySuccessMsg] = useState<string | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<any | null>(null);
   const [longTermTurns, setLongTermTurns] = useState<any[]>([]);
+  const [whatsappContacts, setWhatsappContacts] = useState<{ name: string; phoneNumber: string }[]>([]);
   const savedTurnKeysRef = useRef<Set<string>>(new Set());
   const [kbFiles, setKbFiles] = useState<{ name: string; content: string; size: number }[]>([]);
 
@@ -232,6 +233,19 @@ export default function EburonApp() {
           setMemories(memoryList);
           const prevTurns = context?.recentTurns || await api.fetchConversations(200);
           setLongTermTurns(prevTurns);
+
+          // Fetch WhatsApp contacts metadata for Gemini Live audio context
+          try {
+            const phonebook = await api.fetchWhatsAppPhonebook();
+            if (phonebook?.contacts) {
+              setWhatsappContacts(phonebook.contacts.map((c: any) => ({
+                name: c.name || c.pushname || 'Unknown',
+                phoneNumber: c.phoneNumber || c.id?.split('@')[0] || '',
+              })));
+            }
+          } catch (e) {
+            console.log("WhatsApp contacts not available yet");
+          }
 
           try {
             const { turns, addTurn } = useLogStore.getState();
@@ -854,6 +868,10 @@ export default function EburonApp() {
         currentUserProfile.email ? `Email: ${currentUserProfile.email}` : '',
         currentUserProfile.uid ? `Firebase UID: ${currentUserProfile.uid}` : '',
       ].filter(Boolean).join('\n')
+      : "";
+
+    const whatsappContactsStr = whatsappContacts.length > 0
+      ? `WHATSAPP CONTACTS (available to message/read/call):\n${whatsappContacts.map((c: any) => `- ${c.name} (${c.phoneNumber})`).join('\n')}`
       : "";
 
     // Build conversation history context from previous sessions (read from store to avoid dep loop)
