@@ -180,7 +180,6 @@ export class AudioStreamer {
                 handler.call(node.port, ev);
               });
             };
-            node.connect(this.context.destination);
           }
         });
       }

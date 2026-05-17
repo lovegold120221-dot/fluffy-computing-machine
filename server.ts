@@ -294,24 +294,24 @@ async function startServer() {
     }
   });
 
-  // Conversations
+  // Conversations (vep_chat_messages schema)
   app.get("/api/conversations", authenticateToken, async (req: any, res) => {
     try {
       if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
       const { uid } = req.user;
       const { limit = 100 } = req.query;
-      
+
       const { data, error } = await supabase
-        .from("user_conversations")
+        .from("vep_chat_messages")
         .select("*")
-        .eq("uid", uid)
-        .order("created_at", { ascending: false })
+        .eq("firebase_uid", uid)
+        .order("message_timestamp", { ascending: false })
         .limit(Number(limit));
 
       if (error) {
         if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          return res.status(503).json({ 
-            error: "Conversation database table is missing. Please run the SQL in SCHEMA.sql in your Supabase SQL Editor to enable history.",
+          return res.status(503).json({
+            error: "vep_chat_messages table is missing. Please run the SQL in SCHEMA.sql in your Supabase SQL Editor.",
             setupRequired: true
           });
         }
@@ -328,27 +328,33 @@ async function startServer() {
     try {
       if (!supabase) throw new Error("Database not connected (Supabase keys missing)");
       const { uid } = req.user;
-      const { role, content, session_id } = req.body;
+      const { role, content, session_id, speaker, text, file_name, file_type, file_data_url, tool_name, tool_result } = req.body;
 
       if (!role || !content) {
         return res.status(400).json({ error: "Missing role or content" });
       }
 
       const { data, error } = await supabase
-        .from("user_conversations")
+        .from("vep_chat_messages")
         .insert({
-          uid,
-          role,
-          content,
-          session_id
+          firebase_uid: uid,
+          role: role === 'agent' ? 'model' : role,
+          source: session_id || undefined,
+          speaker: speaker || undefined,
+          text: content,
+          message_timestamp: new Date().toISOString(),
+          file_name: file_name || undefined,
+          file_type: file_type || undefined,
+          file_data_url: file_data_url || undefined,
+          metadata: tool_name ? { tool_name, tool_result } : {},
         })
         .select()
         .single();
 
       if (error) {
         if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          console.warn("Skipping conversation sync: table missing.");
-          return res.status(204).send(); // Silently fail for inserts if table missing
+          console.warn("Skipping conversation sync: vep_chat_messages table missing.");
+          return res.status(204).send();
         }
         throw error;
       }
