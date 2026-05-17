@@ -1078,7 +1078,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       {/* Bottom Dock */}
       <audio
         ref={bgAudioRef}
-        src="/freesound_community-121116-bank-interior-ambience-office-doors-footstaps-printer-typing-voices-17642.mp3"
+        src="/office.mp3"
         loop
       />
       <div className="bottom-dock">
@@ -1678,15 +1678,27 @@ Output only natural spoken text. No stage directions, no brackets, no role label
             <div style={{ display: "flex", alignItems: "center", gap: "4px", fontWeight: 500, color: "#aaa" }}>
               <i className="ph-fill ph-shield-check" style={{ color: "var(--accent-active)" }}></i> Authorization & Full Capabilities
             </div>
-            <ul style={{ margin: 0, paddingLeft: "16px", textAlign: "left", display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
-              <li><strong style={{ color: "#fff" }}>Google Workspace:</strong> Full read/write access to Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Tasks, Contacts, Directory, Keep, and Google Photos.</li>
-              <li><strong style={{ color: "#fff" }}>Live Web Search:</strong> Real-time unrestricted Google Search access for grounded reasoning.</li>
-              <li><strong style={{ color: "#fff" }}>Function Tools:</strong> Full automation capabilities across all synced Google services.</li>
-              <li><strong style={{ color: "#fff" }}>Identity:</strong> Verified Google Profile and secure authentication.</li>
-            </ul>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px", fontSize: "12px", lineHeight: "1.5" }}>
+              <div><strong style={{ color: "#cbfb45" }}>Gmail</strong><br /><span style={{ color: "#888" }}>Read, send, manage labels</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Drive</strong><br /><span style={{ color: "#888" }}>Full file access + metadata</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Calendar</strong><br /><span style={{ color: "#888" }}>Read/write events</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Docs</strong><br /><span style={{ color: "#888" }}>Create and edit documents</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Sheets</strong><br /><span style={{ color: "#888" }}>Create and edit spreadsheets</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Slides</strong><br /><span style={{ color: "#888" }}>Create presentations</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Forms</strong><br /><span style={{ color: "#888" }}>Manage forms</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Tasks</strong><br /><span style={{ color: "#888" }}>Full task management</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Contacts</strong><br /><span style={{ color: "#888" }}>Read/write address book</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Directory</strong><br /><span style={{ color: "#888" }}>Read org directory</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>YouTube</strong><br /><span style={{ color: "#888" }}>Search, upload, manage</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Google Chat</strong><br /><span style={{ color: "#888" }}>Send and read messages</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Apps Script</strong><br /><span style={{ color: "#888" }}>Run automation scripts</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Profile</strong><br /><span style={{ color: "#888" }}>Name, email, phone, address, birthday, gender, org</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Firebase</strong><br /><span style={{ color: "#888" }}>Messaging, Database, Cloud Storage</span></div>
+              <div><strong style={{ color: "#cbfb45" }}>Google Cloud</strong><br /><span style={{ color: "#888" }}>Functions, Pub/Sub, Logging, Monitoring</span></div>
+            </div>
             <div style={{ marginTop: "12px", display: "flex", gap: "8px", alignItems: "flex-start", textAlign: "left", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
               <input type="checkbox" id="consent" style={{ marginTop: "4px", cursor: "pointer" }} checked={hasConsented} onChange={(e) => setHasConsented(e.target.checked)} />
-              <label htmlFor="consent" style={{ color: "#fff", cursor: "pointer", fontSize: "13px", lineHeight: "1.4" }}>I explicitly grant Eburon full permission to access my Google Workspace APIs, perform web searches, and utilize function tools on my behalf to automate my professional and personal life.</label>
+              <label htmlFor="consent" style={{ color: "#fff", cursor: "pointer", fontSize: "13px", lineHeight: "1.4" }}>I explicitly grant Eburon full permission to access all listed Google services and data on my behalf to automate my professional and personal life.</label>
             </div>
           </div>
         </div>
