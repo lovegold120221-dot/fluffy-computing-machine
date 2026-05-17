@@ -79,6 +79,39 @@ const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey, {
   },
 }) : null;
 
+async function runMigrations() {
+  if (!supabaseUrl || !supabaseKey) return;
+  const migrations = [
+    `ALTER TABLE user_conversations ADD COLUMN IF NOT EXISTS session_id TEXT;`,
+    `ALTER TABLE user_conversations ALTER COLUMN session_id SET DEFAULT 'legacy';`,
+    `ALTER TABLE user_conversations ADD COLUMN IF NOT EXISTS client_turn_id TEXT;`,
+    `ALTER TABLE user_conversations ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'text';`,
+    `ALTER TABLE user_conversations ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';`,
+    `CREATE INDEX IF NOT EXISTS idx_user_conversations_uid_session_created_at ON user_conversations (uid, session_id, created_at ASC);`,
+    `CREATE TABLE IF NOT EXISTS conversation_sessions (session_id TEXT NOT NULL, uid TEXT NOT NULL, title TEXT, summary TEXT, metadata JSONB DEFAULT '{}', started_at TIMESTAMPTZ DEFAULT now(), last_message_at TIMESTAMPTZ DEFAULT now(), created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (uid, session_id));`,
+    `CREATE INDEX IF NOT EXISTS idx_conversation_sessions_uid_last_message ON conversation_sessions (uid, last_message_at DESC);`,
+  ];
+  for (const query of migrations) {
+    try {
+      const res = await fetch(`${supabaseUrl}/sql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.warn(`Migration warning (${res.status}):`, text.slice(0, 200));
+      }
+    } catch (e: any) {
+      console.warn(`Migration skipped:`, e.message);
+    }
+  }
+}
+
 type AuthenticatedRequest = express.Request & {
   user?: admin.auth.DecodedIdToken;
 };
@@ -1460,33 +1493,48 @@ async function startServer() {
     try {
       const uid = req.user?.uid;
       if (!uid) return jsonError(res, 401, "UNAUTHORIZED", "User not identified.");
-      
-      const { text, voiceCloneId, duration } = req.body;
-      
+
+      const { text, voiceId, language, emotion, speed, volume } = req.body;
+
       if (!text) {
         return jsonError(res, 400, "MISSING_TEXT", "Text required for voice generation.");
       }
 
-      // Generate audio via Cartesia API
       const cartesiaApiKey = process.env.CARTESIA_API_KEY;
       if (!cartesiaApiKey) {
         return jsonError(res, 500, "CARTESIA_NOT_CONFIGURED", "Cartesia API key not configured.");
       }
 
-      const voiceId = voiceCloneId || process.env.DEFAULT_VOICE_ID || "7c0b2e18-6f6e-4d86-a0a8-0e1c3e0e0e0e";
-      
+      const usedVoiceId = voiceId || process.env.CARTESIA_VOICE_ID || "8f1b2cc5-af0c-4567-a2c2-bf0f1dc49220";
+      const usedLanguage = language || "en";
+      const usedEmotion = emotion || "content";
+      const usedSpeed = speed ?? 1;
+      const usedVolume = volume ?? 1;
+
       const response = await fetch("https://api.cartesia.ai/tts/bytes", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${cartesiaApiKey}`,
+          "Cartesia-Version": "2026-03-01",
+          "X-API-Key": cartesiaApiKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model_id: "tts-1-8k",
+          model_id: "sonic-3.5",
           transcript: text,
           voice: {
-            voice_id: voiceId,
-            mode: "SANDBOX", // or use specific voice_clone_id
+            mode: "id",
+            id: usedVoiceId,
+          },
+          output_format: {
+            container: "wav",
+            encoding: "pcm_s16le",
+            sample_rate: 44100,
+          },
+          language: usedLanguage,
+          generation_config: {
+            speed: usedSpeed,
+            volume: usedVolume,
+            emotion: usedEmotion,
           },
         }),
       });
@@ -1496,11 +1544,9 @@ async function startServer() {
         return jsonError(res, 500, "CARTESIA_ERROR", errText);
       }
 
-      // Get audio as ArrayBuffer then convert to base64
       const audioBuffer = await response.arrayBuffer();
       const base64Audio = Buffer.from(audioBuffer).toString("base64");
 
-      // Log activity
       if (supabase) {
         await supabase.from("whatsapp_activities").insert({
           user_id: uid,
@@ -1509,7 +1555,7 @@ async function startServer() {
           content: text,
           status: "success",
           source: "gemini_live_audio",
-          metadata: { voiceId, duration },
+          metadata: { voiceId: usedVoiceId, language: usedLanguage, emotion: usedEmotion, model: "sonic-3.5" },
           created_at: new Date().toISOString(),
         });
       }
@@ -1517,95 +1563,14 @@ async function startServer() {
       res.json({
         success: true,
         audioBase64: base64Audio,
-        voiceId,
-        format: "pcm",
-        sampleRate: 8000,
+        voiceId: usedVoiceId,
+        format: "wav",
+        sampleRate: 44100,
+        encoding: "pcm_s16le",
       });
     } catch (err: any) {
       console.error("POST /api/cartesia/generate-voice:", err.message);
       jsonError(res, 500, "VOICE_GENERATION_ERROR", err.message);
-    }
-  });
-
-  // ── Evolution Webhook Receiver ──
-  app.post("/webhooks/evolution", async (req, res) => {
-    try {
-      const secret = (req.headers["x-webhook-secret"] as string) || "";
-      if (!verifyWebhookSecret(secret)) {
-        return res.status(403).json({ error: "Invalid webhook secret" });
-      }
-
-      const { event, instance } = req.body || {};
-      console.log("Evolution webhook:", event, instance);
-
-      if (!instance) return res.status(200).json({ received: true });
-
-      const db = requireSupabase(res);
-      if (!db) return res.status(200).json({ received: true });
-
-      const { data: conn } = await db
-        .from("whatsapp_connections")
-        .select("user_id")
-        .eq("instance_name", instance)
-        .maybeSingle();
-
-      if (!conn) return res.status(200).json({ received: true });
-
-      // Handle connection updates
-      if (event === "CONNECTION_UPDATE" || event === "QRCODE_UPDATED") {
-        const body = req.body?.data || req.body;
-        const state = normalizeEvolutionState(body?.state || body?.statusReason || "close");
-        await db.from("whatsapp_connections")
-          .update({
-            status: state,
-            phone_number: body?.phoneNumber || body?.number || undefined,
-            last_connection_state: body?.state || body?.statusReason || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", conn.user_id);
-      }
-
-      // Handle incoming messages — forward to agent
-      if (event === "MESSAGES_UPSERT") {
-        const msg = req.body?.data || req.body;
-        if (msg?.key?.fromMe) {
-          return res.status(200).json({ received: true }); // skip own messages
-        }
-
-        const messageText =
-          msg?.message?.conversation ||
-          msg?.message?.extendedTextMessage?.text ||
-          msg?.message?.imageMessage?.caption ||
-          "";
-
-        const senderNumber = msg?.key?.remoteJid?.split("@")[0] || "unknown";
-
-        if (messageText) {
-          console.log(
-            `WhatsApp incoming [${conn.user_id}]: ${senderNumber}: ${messageText}`,
-          );
-
-          // Store incoming as a conversation turn for agent context
-          try {
-            const { error: insertErr } = await db.from("conversations").insert({
-              uid: conn.user_id,
-              session_id: `whatsapp_${instance}`,
-              role: "user",
-              content: `[WhatsApp ${senderNumber}] ${messageText}`,
-              source: "whatsapp",
-              created_at: new Date().toISOString(),
-            });
-            if (insertErr) console.warn("Failed to log WhatsApp turn:", insertErr.message);
-          } catch (e: any) {
-            console.warn("Failed to log WhatsApp turn:", e.message);
-          }
-        }
-      }
-
-      res.status(200).json({ received: true });
-    } catch (err: any) {
-      console.error("Webhook error:", err.message);
-      res.status(200).json({ received: true }); // Always 200 to avoid retries
     }
   });
 
@@ -1697,6 +1662,10 @@ async function startServer() {
       jsonError(res, 500, "CALL_INITIATE_ERROR", err.message);
     }
   });
+
+  //
+  // Run database migrations on startup
+  await runMigrations();
 
   //
   // Load scheduled automations on startup

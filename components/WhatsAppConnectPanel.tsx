@@ -8,6 +8,7 @@ export default function WhatsAppConnectPanel() {
   const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [accountName, setAccountName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,6 +20,14 @@ export default function WhatsAppConnectPanel() {
       if (data.status === "connected") {
         setQrBase64(null);
         setPairingCode(null);
+        // Fetch instance details for account name
+        try {
+          const details = await api.getWhatsAppInstanceStatus();
+          if (details.phoneNumber) setPhoneNumber(details.phoneNumber);
+          if (details.accountName || details.phoneNumberFormatted) {
+            setAccountName(details.accountName || details.phoneNumberFormatted || details.phoneNumber);
+          }
+        } catch {}
       }
       if (data.qrBase64 && !qrBase64) {
         setQrBase64(data.qrBase64);
@@ -115,10 +124,19 @@ export default function WhatsAppConnectPanel() {
           <p style={{ color: "var(--text-main)", fontWeight: 600, marginBottom: "4px" }}>
             Connected
           </p>
-          {phoneNumber && (
-            <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "12px" }}>
-              {phoneNumber}
-            </p>
+          {(accountName || phoneNumber) && (
+            <div style={{ marginBottom: "12px" }}>
+              {accountName && (
+                <p style={{ color: "var(--text-main)", fontSize: "14px", fontWeight: 500, marginBottom: "2px" }}>
+                  {accountName}
+                </p>
+              )}
+              {phoneNumber && (
+                <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "0" }}>
+                  {phoneNumber}
+                </p>
+              )}
+            </div>
           )}
           <button
             onClick={handleDisconnect}

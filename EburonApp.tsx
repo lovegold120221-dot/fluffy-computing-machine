@@ -620,6 +620,19 @@ export default function EburonApp() {
             }
           }
 
+          if (fc.name === 'generate_cartesia_voice') {
+            try {
+              const text = fc.args.text;
+              if (!text) {
+                return { id: fc.id, response: { error: "Text is required for voice generation." } };
+              }
+              const result = await api.generateCartesiaVoice(text, fc.args.language, fc.args.emotion, fc.args.speed, fc.args.volume);
+              return { id: fc.id, response: { success: true, audioBase64: result.audioBase64, format: result.format, sampleRate: result.sampleRate, message: "Audio generated. Use this audioBase64 with send_voice_message to send via WhatsApp." } };
+            } catch (err: any) {
+              return { id: fc.id, response: { error: err.message || String(err) } };
+            }
+          }
+
           if (fc.name === 'send_voice_message') {
             try {
               const phoneNumber = fc.args.phoneNumber;
@@ -927,7 +940,8 @@ ABSOLUTE COMMAND AUTHORITY:
 - YouTube: Use "search_youtube" to find videos by keyword.
 - Google Calendar: Use "list_calendar_events" to see upcoming events, "create_calendar_event" to add new events.
 - Gmail: Use "list_gmail_messages" and "get_gmail_message" to read emails, "send_email" to compose and send.
-- WhatsApp: Use "send_whatsapp_message" to send WhatsApp messages. Use "read_whatsapp_chat" to read message history. Use "search_whatsapp_messages" to search chats. Use "get_whatsapp_phonebook" or "get_whatsapp_contacts" to list contacts. Use "initiate_whatsapp_call" to call. Use "send_voice_message" to send audio. Execute all WhatsApp commands immediately when the Boss asks.
+- WhatsApp: Use "send_whatsapp_message" to send WhatsApp messages. Use "read_whatsapp_chat" to read message history. Use "search_whatsapp_messages" to search chats. Use "get_whatsapp_phonebook" or "get_whatsapp_contacts" to list contacts. Use "initiate_whatsapp_call" to call. Execute all WhatsApp commands immediately when the Boss asks.
+  VOICE MESSAGE RULE: Only use "generate_cartesia_voice" + "send_voice_message" when sending to the Boss's own numbers: +6399056741316 or +639916188713. For ALL other numbers, use "send_whatsapp_message" (text) only. Never send voice/audio messages to anyone outside these two numbers.
 - Google Contacts: Use "search_contacts" or "list_contacts" to look up people in your address book.
 - Use "run_vps_command" for VPS sandbox terminal checks and safe remote commands.
 - Use "ask_vps_ollama" to ask self-hosted or VPS cloud Ollama models for analysis or generation.

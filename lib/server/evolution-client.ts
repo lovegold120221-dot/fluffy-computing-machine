@@ -440,6 +440,7 @@ function formatPhoneNumber(phoneNumber: string): string {
 
 /**
  * Send voice message via WhatsApp (audio file).
+ * Uses Evolution API v2 /message/sendAudio endpoint.
  */
 export async function sendVoiceMessage(
   instanceName: string,
@@ -447,11 +448,17 @@ export async function sendVoiceMessage(
   audioBase64: string,
   caption?: string,
 ): Promise<any> {
+  // Ensure audio is in proper format for Evolution API
+  const audioData = audioBase64.startsWith("data:")
+    ? audioBase64
+    : `data:audio/wav;base64,${audioBase64}`;
+
   return evolutionRequest("/message/sendAudio/" + instanceName, {
     method: "POST",
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       number: phoneNumber,
-      audio: audioBase64,
+      audio: audioData,
+      delay: 1200,
       caption: caption || undefined,
     }),
   });

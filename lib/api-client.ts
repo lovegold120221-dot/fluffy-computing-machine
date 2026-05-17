@@ -462,19 +462,23 @@ export async function fetchWhatsAppActivities(options: {
 
 export async function generateCartesiaVoice(
   text: string,
-  voiceCloneId?: string
+  language?: string,
+  emotion?: string,
+  speed?: number,
+  volume?: number
 ): Promise<{
   success: boolean;
   audioBase64: string;
   voiceId: string;
   format: string;
   sampleRate: number;
+  encoding: string;
 }> {
   const headers = await getHeaders();
   const res = await fetch("/api/cartesia/generate-voice", {
     method: "POST",
     headers,
-    body: JSON.stringify({ text, voiceCloneId }),
+    body: JSON.stringify({ text, language, emotion, speed, volume }),
   });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to generate Cartesia voice"));
