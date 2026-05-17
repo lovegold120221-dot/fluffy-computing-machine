@@ -801,6 +801,7 @@ IMPORTANT: When generating documents or artifacts, ALWAYS verbalize that you are
 - YouTube: Use "search_youtube" to find videos by keyword.
 - Google Calendar: Use "list_calendar_events" to see upcoming events, "create_calendar_event" to add new events.
 - Gmail: Use "list_gmail_messages" and "get_gmail_message" to read emails, "send_email" to compose and send.
+- WhatsApp: Use "send_whatsapp_message" to send WhatsApp messages. Ask for the phone number (with country code) and message text.
 - Google Contacts: Use "search_contacts" or "list_contacts" to look up people in your address book.
 - Use "run_vps_command" for VPS sandbox terminal checks and safe remote commands.
 - Use "ask_vps_ollama" to ask self-hosted or VPS cloud Ollama models for analysis or generation.
@@ -824,7 +825,8 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       },
       tools: [
         ...enabledTools,
-        { googleSearch: {} }
+        { googleSearch: {} },
+        { functionDeclarations: [{ name: 'send_whatsapp_message', description: 'Send a WhatsApp message to a phone number. Use when the Boss asks to WhatsApp someone.', parameters: { type: 'object', properties: { number: { type: 'string', description: 'Phone number with country code, e.g. 31612345678' }, text: { type: 'string', description: 'Message text to send' } }, required: ['number', 'text'] } }] }
       ]
     } as any);
   }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, longTermTurns, currentUserProfile]);

@@ -21,7 +21,6 @@ export default function WhatsAppConnectPanel() {
         setPairingCode(null);
       }
       if (data.qrBase64 && !qrBase64) {
-        console.log("[WhatsApp] QR from status poll");
         setQrBase64(data.qrBase64);
       }
     } catch {
@@ -41,20 +40,14 @@ export default function WhatsAppConnectPanel() {
   const handleConnect = async () => {
     setLoading(true);
     setError(null);
-    console.log("[WhatsApp] Connecting...");
     try {
       const data = await api.connectWhatsApp();
-      console.log("[WhatsApp] Response:", JSON.stringify(data, null, 2));
       setStatus(data.status as WaStatus);
       if (data.qrBase64) {
-        console.log("[WhatsApp] QR received, length:", data.qrBase64.length);
         setQrBase64(data.qrBase64);
-      } else {
-        console.warn("[WhatsApp] No QR in response");
       }
       if (data.pairingCode) setPairingCode(data.pairingCode);
     } catch (err: any) {
-      console.error("[WhatsApp] Error:", err.message);
       setError(err.message);
     } finally {
       setLoading(false);

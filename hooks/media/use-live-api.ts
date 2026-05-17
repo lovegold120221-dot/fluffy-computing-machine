@@ -690,6 +690,29 @@ export function useLiveApi({
       useUI.getState().setResultData(JSON.stringify(functionResponses, null, 2));
       useUI.getState().setShowResultPage(true);
 
+      if (fc.name === 'send_whatsapp_message') {
+          const { number, text } = fc.args as any;
+          if (!number || !text) {
+            responsePayload = { error: 'Missing number or text for WhatsApp message.' };
+          } else {
+            try {
+              const token = await auth.currentUser?.getIdToken();
+              const res = await fetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ number, text }),
+              });
+              const json = await res.json();
+              responsePayload = json;
+            } catch (e: any) {
+              responsePayload = { error: e.message };
+            }
+          }
+        }
+
       client.sendToolResponse({ functionResponses: functionResponses });
     };
 

@@ -1,10 +1,10 @@
 // ── Evolution API Client for WhatsApp Integration ──
 // Doc: https://doc.evolution-api.com
 
-const EVO_URL = process.env.EVOLUTION_API_URL || "";
-const EVO_KEY = process.env.EVOLUTION_API_KEY || "";
-const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || "";
-const BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "http://localhost:3000";
+function getEvoUrl() { return process.env.EVOLUTION_API_URL || ""; }
+function getEvoKey() { return process.env.EVOLUTION_API_KEY || ""; }
+function getWebhookSecret() { return process.env.EVOLUTION_WEBHOOK_SECRET || ""; }
+function getBackendUrl() { return process.env.PUBLIC_BACKEND_URL || "http://localhost:3000"; }
 
 export interface EvolutionInstance {
   instanceName: string;
@@ -23,7 +23,7 @@ export interface EvolutionWebhook {
 // ── Helpers ──
 
 function evoUrl(path: string): string {
-  return `${EVO_URL}${path}`;
+  return `${getEvoUrl()}${path}`;
 }
 
 export async function evolutionRequest<T = any>(
@@ -35,7 +35,7 @@ export async function evolutionRequest<T = any>(
     ...options,
     headers: {
       "Content-Type": "application/json",
-      apikey: EVO_KEY,
+      apikey: getEvoKey(),
       ...(options.headers || {}),
     },
   });
@@ -53,7 +53,8 @@ export async function evolutionRequest<T = any>(
 }
 
 export function verifyWebhookSecret(secret: string): boolean {
-  return WEBHOOK_SECRET && secret === WEBHOOK_SECRET;
+  const s = getWebhookSecret();
+  return s && secret === s;
 }
 
 // ── Instance Management ──

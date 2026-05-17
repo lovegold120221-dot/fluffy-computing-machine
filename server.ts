@@ -45,7 +45,7 @@ import {
 dotenv.config();
 dotenv.config({ path: '.env.local' });
 
-const BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "http://localhost:3000";
+function getBackendUrl() { return process.env.PUBLIC_BACKEND_URL || "http://localhost:3000"; }
 
 // Initialize Firebase Admin for Authentication
 if (!admin.apps.length) {
@@ -971,7 +971,7 @@ async function startServer() {
       if (!db) return;
 
       const instanceName = `beatrice_user_${uid}`;
-      const webhookUrl = `${BACKEND_URL}/webhooks/evolution`;
+      const webhookUrl = `${getBackendUrl()}/webhooks/evolution`;
 
       // Check existing connection
       const { data: existing } = await db
