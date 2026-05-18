@@ -1,9 +1,3 @@
-Here is the fully updated code. I have integrated the lore and background you
-requested into her system prompt, and introduced randomization to her intro
-greetings and silent fillers so she never sounds repetitive. I also added strict
-instructions to her system prompt to ensure she uses dynamic, ever-changing
-phrases when acknowledging background tasks.
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveAPIContext } from './contexts/LiveAPIContext';
 import { useLogStore, useTools, useSettings, useUI } from './lib/state';
