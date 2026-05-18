@@ -33,6 +33,15 @@ const makeStableHash = (value: string) => {
 
 const normalizeTurnText = (value: string) => value.replace(/\s+/g, ' ').trim();
 
+// Helper for smart text accumulation (handles both deltas and full string replacements)
+const accumulateText = (current: string, next: string) => {
+  if (!current) return next;
+  if (current === next) return current;
+  if (next.startsWith(current)) return next;
+  if (current.startsWith(next)) return current; // out of order or duplicate
+  return current + next;
+};
+
 export default function EburonApp() {
   const [isAuthOpen, setIsAuthOpen] = useState(true);
   const [isSignupMode, setIsSignupMode] = useState(false);
@@ -75,7 +84,7 @@ export default function EburonApp() {
 
   // Pause bg audio when Gemini AI is speaking; resume when it stops
   useEffect(() => {
-    const isSpeaking = volume > 0.01;
+    const isSpeaking = volume > 0.02;
     if (isSpeaking && !geminiAudioActiveRef.current && bgAudioRef.current) {
       geminiAudioActiveRef.current = true;
       bgAudioRef.current.pause();
@@ -180,9 +189,7 @@ export default function EburonApp() {
   }, [sessionID]);
 
   useEffect(() => {
-    // testConnection(); // Firestore specific, skipping for now as we use Postgres
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Diagnostic health check
       try {
         const health = await fetch("/api/health").then(r => r.json());
         console.log("Backend health check:", health);
@@ -196,17 +203,13 @@ export default function EburonApp() {
         savedTurnKeysRef.current.clear();
 
         try {
-          // Restore Google token from Supabase on page reload
           try {
             const storedToken = await api.fetchGoogleToken();
             if (storedToken?.access_token) {
               useAuth.getState().setGoogleAccessToken(storedToken.access_token);
             }
-          } catch (e) {
-            // No stored token — user needs to authenticate with Google
-          }
+          } catch (e) {}
 
-          // Fetch Settings
           const settings = await api.fetchSettings();
           setPersonaName(settings.persona_name);
           setUserCallName(settings.user_call_name);
@@ -228,13 +231,11 @@ export default function EburonApp() {
             } : null);
           }
 
-          // Fetch memories and previous conversation turns for this Firebase UID.
           const memoryList = context?.memories || await api.fetchMemories();
           setMemories(memoryList);
           const prevTurns = context?.recentTurns || await api.fetchConversations(200);
           setLongTermTurns(prevTurns);
 
-          // Fetch WhatsApp contacts metadata for Gemini Live audio context
           try {
             const phonebook = await api.fetchWhatsAppPhonebook();
             if (phonebook?.contacts) {
@@ -289,7 +290,8 @@ export default function EburonApp() {
   const aiIsSpeakingRef = useRef(false);
 
   useEffect(() => {
-    if (clientVolume > 0.01) {
+    // Increased clientVolume threshold to avoid background noise resetting silence
+    if (clientVolume > 0.05) {
       lastUserSpeechTime.current = Date.now();
       fillerTriggeredRef.current = false;
     }
@@ -297,14 +299,13 @@ export default function EburonApp() {
 
   useEffect(() => {
     if (volume > 0.05) {
-      // AI is speaking, reset the silence timer so we count 15s from AFTER it stops
       aiIsSpeakingRef.current = true;
       lastUserSpeechTime.current = Date.now();
       fillerTriggeredRef.current = false;
     } else {
       if (aiIsSpeakingRef.current) {
         aiIsSpeakingRef.current = false;
-        lastUserSpeechTime.current = Date.now(); // Start timer exactly when AI stops
+        lastUserSpeechTime.current = Date.now(); 
       }
     }
   }, [volume]);
@@ -318,7 +319,6 @@ export default function EburonApp() {
 
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
-    // Helper: finalize the last turn if it's still in-progress for a given role
     const finalizeLastTurnIfNeeded = (role: 'user' | 'agent') => {
       const currentTurns = useLogStore.getState().turns;
       const last = currentTurns[currentTurns.length - 1];
@@ -333,31 +333,30 @@ export default function EburonApp() {
     };
 
     const handleInputTranscription = (text: string, isFinal: boolean) => {
+      const cleanText = text.trim();
       const currentTurns = useLogStore.getState().turns;
       const last = currentTurns[currentTurns.length - 1];
 
-      // If the agent was speaking (in-progress), finalize that turn first
-      if (last && last.role === 'agent' && !last.isFinal) {
+      // If the agent was speaking, only finalize their turn if the user actually said something
+      if (last && last.role === 'agent' && !last.isFinal && cleanText.length > 0) {
         finalizeLastTurnIfNeeded('agent');
         currentAgentText.current = "";
       }
 
-      // Accumulate text for the current user turn (Gemini fires full transcript each time)
-      currentUserText.current = text;
+      // Smart accumulate to handle real-time rendering accurately
+      currentUserText.current = accumulateText(currentUserText.current, text);
       const fullText = currentUserText.current;
 
-      // Check again after potential finalization
       const updatedTurns = useLogStore.getState().turns;
       const updatedLast = updatedTurns[updatedTurns.length - 1];
 
       if (updatedLast && updatedLast.role === 'user' && !updatedLast.isFinal) {
         updateLastTurn({ text: fullText });
-      } else if (text.trim()) {
+      } else if (fullText.trim()) {
         addTurn({ role: 'user', text: fullText, isFinal: false });
       }
 
       if (isFinal) {
-        // Finalize current user turn and reset accumulator for next utterance
         const finalTurns = useLogStore.getState().turns;
         const finalLast = finalTurns[finalTurns.length - 1];
         if (finalLast && finalLast.role === 'user' && !finalLast.isFinal) {
@@ -369,17 +368,18 @@ export default function EburonApp() {
     };
 
     const handleOutputTranscription = (text: string, isFinal: boolean) => {
+      const cleanText = text.trim();
       const currentTurns = useLogStore.getState().turns;
       const last = currentTurns[currentTurns.length - 1];
 
-      // If the user was speaking (in-progress), finalize that turn first
-      if (last && last.role === 'user' && !last.isFinal) {
+      // If the user was speaking, finalize their turn
+      if (last && last.role === 'user' && !last.isFinal && cleanText.length > 0) {
         finalizeLastTurnIfNeeded('user');
         currentUserText.current = "";
       }
 
-      // Accumulate text for the current agent turn (Gemini fires full transcript each time)
-      currentAgentText.current = text;
+      // Smart accumulate for accurate real-time display
+      currentAgentText.current = accumulateText(currentAgentText.current, text);
       const fullText = currentAgentText.current;
 
       const updatedTurns = useLogStore.getState().turns;
@@ -387,7 +387,7 @@ export default function EburonApp() {
 
       if (updatedLast && updatedLast.role === 'agent' && !updatedLast.isFinal) {
         updateLastTurn({ text: fullText });
-      } else if (text.trim()) {
+      } else if (fullText.trim()) {
         addTurn({ role: 'agent', text: fullText, isFinal: false });
       }
 
@@ -402,12 +402,7 @@ export default function EburonApp() {
       }
     };
 
-    const handleContent = (serverContent: any) => {
-      // Prioritize outputTranscription for agent text to ensure synchronization with audio.
-      // However, we still need to handle tool calls and other non-text parts if they arrive here.
-      // In this app, tool calls are already handled via the 'toolcall' event listener.
-      // so we can safely ignore modelTurn text here to avoid duplication/clashes.
-    };
+    const handleContent = (serverContent: any) => {};
 
     const handleInterrupted = () => {
       const last = useLogStore.getState().turns.at(-1);
@@ -416,22 +411,25 @@ export default function EburonApp() {
         saveFinalTurn('agent', last.text, 'voice', last.timestamp, { interrupted: true });
       }
       currentAgentText.current = "";
+      
+      // Reduce voice sensitivity: only explicitly acknowledge interruption if the user actually said something, 
+      // preventing the AI from apologizing for small background noises.
+      if (currentUserText.current.trim().length > 0) {
+        client.send([{ text: "SYSTEM: The Boss just interrupted you. That means they want to say something or redirect. Acknowledge it subtly in your next response — a quick 'Sorry, go ahead' or 'Mm, you go' or just pause and let them speak. Do not apologize excessively. Do not over-explain. Just yield the floor naturally like a human would." }]);
+      }
       currentUserText.current = "";
-      client.send([{ text: "SYSTEM: The Boss just interrupted you. That means they want to say something or redirect. Acknowledge it subtly in your next response — a quick 'Sorry, go ahead' or 'Mm, you go' or just pause and let them speak. Do not apologize excessively. Do not over-explain. Just yield the floor naturally like a human would." }]);
     };
 
     const handleTurnComplete = () => {
       const last = useLogStore.getState().turns.at(-1);
       if (last && !last.isFinal) {
         updateLastTurn({ isFinal: true });
-        // Save turn to backend
         if (last.role === 'agent') {
           saveFinalTurn('agent', last.text, 'voice', last.timestamp);
         } else if (last.role === 'user') {
           saveFinalTurn('user', last.text, 'voice', last.timestamp);
         }
       }
-      // Reset accumulators for the next exchange
       currentAgentText.current = "";
       currentUserText.current = "";
     };
@@ -449,7 +447,6 @@ export default function EburonApp() {
 
       const responses = await Promise.all(
         functionCalls.map(async (fc: any) => {
-          // Log the function call in the UI as a system turn
           const toolTimestamp = new Date();
           useLogStore.getState().addTurn({
             role: 'system',
@@ -465,20 +462,14 @@ export default function EburonApp() {
             const type = fc.args.type || 'personal';
 
             if (!content) {
-              return {
-                id: fc.id,
-                response: { error: "Missing content" }
-              };
+              return { id: fc.id, response: { error: "Missing content" } };
             }
 
             try {
               await api.saveMemory(content, type);
               const memoryList = await api.fetchMemories();
               setMemories(memoryList);
-              return {
-                id: fc.id,
-                response: { success: true, status: "Memory saved." }
-              };
+              return { id: fc.id, response: { success: true, status: "Memory saved." } };
             } catch (err: any) {
               return { id: fc.id, response: { error: err.message || String(err) } };
             }
@@ -772,23 +763,19 @@ export default function EburonApp() {
     let interval: NodeJS.Timeout;
     if (connected) {
       interval = setInterval(() => {
-        // Increment timer
         setTimerSeconds(prev => {
           const next = prev + 1;
 
-          // 19:00 Warning
           if (next === 1140 && !warnedAt19Ref.current) {
             warnedAt19Ref.current = true;
             client.send([{ text: "SYSTEM: It is now the 19 minute mark of the session. Calmly and warmly inform the user that the session will be cut in about 60 seconds due to technical limits, but they can always reconnect right back. Say it naturally." }]);
           }
 
-          // 19:50 Goodbye
           if (next === 1190 && !warnedAt1950Ref.current) {
             warnedAt1950Ref.current = true;
             client.send([{ text: "SYSTEM: 19:50 mark reached. Say a final, warm goodbye as the session is about to be terminated in 10 seconds. Pick up from current context." }]);
           }
 
-          // 20:00 Terminate
           if (next >= 1200) {
             disconnect();
           }
@@ -828,7 +815,6 @@ export default function EburonApp() {
       hasStartedRef.current = true;
       lastUserSpeechTime.current = Date.now();
       fillerTriggeredRef.current = false;
-      // AI starts the conversation on connection
       const contextTurns = longTermTurns.length > 0 ? longTermTurns : turns;
       const pastConversations = contextTurns
         .filter((t: any) => (t.isFinal ?? true) && (t.text || t.content) && t.role !== 'system')
@@ -840,15 +826,13 @@ export default function EburonApp() {
       setTimeout(() => {
         const intro = `Session started. Give a very casual, short greeting as if we are coworkers passing by or jumping on a call. Pick up from any previous context if there is any. Do NOT offer help.${historyContext}`;
         client.send([{ text: intro }]);
-        // We don't necessarily want to log this "SYSTEM" instruction to the user, but we could log it for debugging if needed.
-        // However, the AI will respond, and THAT will be logged and saved.
       }, 1000);
     }
     if (!connected) {
       hasStartedRef.current = false;
       fillerTriggeredRef.current = false;
     }
-  }, [connected, client, longTermTurns /* turns intentionally omitted */]);
+  }, [connected, client, longTermTurns]);
 
   useEffect(() => {
     const enabledTools = tools
@@ -874,7 +858,6 @@ export default function EburonApp() {
       ? `WHATSAPP CONTACTS (available to message/read/call):\n${whatsappContacts.map((c: any) => `- ${c.name} (${c.phoneNumber})`).join('\n')}`
       : "";
 
-    // Build conversation history context from previous sessions (read from store to avoid dep loop)
     const storeTurns = useLogStore.getState().turns;
     const historySourceTurns = longTermTurns.length > 0 ? longTermTurns : storeTurns;
     const historyTurns = historySourceTurns
@@ -883,6 +866,7 @@ export default function EburonApp() {
     const historyStr = historyTurns.length > 0
       ? historyTurns.map((t: any) => `${t.role === 'user' ? userCallName : personaName}: ${t.text || t.content}`).join('\n')
       : "";
+
     setConfig({
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
@@ -1077,7 +1061,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
   const handleGoogleLogin = async () => {
     setAuthError('');
     const provider = new GoogleAuthProvider();
-    // Workspace — read/write
     provider.addScope('https://www.googleapis.com/auth/calendar');
     provider.addScope('https://www.googleapis.com/auth/calendar.events');
     provider.addScope('https://www.googleapis.com/auth/gmail.modify');
@@ -1095,7 +1078,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/tasks');
     provider.addScope('https://www.googleapis.com/auth/contacts');
     provider.addScope('https://www.googleapis.com/auth/directory.readonly');
-    // People & Profile
     provider.addScope('https://www.googleapis.com/auth/userinfo.email');
     provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
     provider.addScope('https://www.googleapis.com/auth/user.phonenumbers.read');
@@ -1103,12 +1085,10 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
     provider.addScope('https://www.googleapis.com/auth/user.gender.read');
     provider.addScope('https://www.googleapis.com/auth/user.organization.read');
-    // YouTube
     provider.addScope('https://www.googleapis.com/auth/youtube');
     provider.addScope('https://www.googleapis.com/auth/youtube.upload');
     provider.addScope('https://www.googleapis.com/auth/youtubepartner');
     provider.addScope('https://www.googleapis.com/auth/photoslibrary');
-    // Firebase & GCP Backend
     provider.addScope('https://www.googleapis.com/auth/firebase');
     provider.addScope('https://www.googleapis.com/auth/firebase.messaging');
     provider.addScope('https://www.googleapis.com/auth/firebase.database');
@@ -1118,15 +1098,11 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     provider.addScope('https://www.googleapis.com/auth/logging.write');
     provider.addScope('https://www.googleapis.com/auth/monitoring');
     provider.addScope('https://www.googleapis.com/auth/cloud-platform');
-    // Chat
-    // Google Maps & Geo
     provider.addScope('https://www.googleapis.com/auth/cloud-translation');
     provider.addScope('https://www.googleapis.com/auth/cloud-vision');
-    // Analytics & BigQuery
     provider.addScope('https://www.googleapis.com/auth/analytics');
     provider.addScope('https://www.googleapis.com/auth/analytics.readonly');
     provider.addScope('https://www.googleapis.com/auth/bigquery');
-
     provider.addScope('https://www.googleapis.com/auth/chat');
     provider.addScope('https://www.googleapis.com/auth/chat.messages');
 
@@ -1251,6 +1227,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                 <div key={`l-${i}`} className="timer-vis-bar" style={{
                   height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
                   opacity: 0.4 + (volume * 0.6),
+                  transition: 'height 0.15s ease-out, opacity 0.15s ease-out'
                 }} />
               ))}
               <div style={{
@@ -1268,6 +1245,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                 <div key={`r-${i}`} className="timer-vis-bar" style={{
                   height: `${4 + (volume * (24 + (i % 3 === 0 ? 18 : 10)))}px`,
                   opacity: 0.4 + (volume * 0.6),
+                  transition: 'height 0.15s ease-out, opacity 0.15s ease-out'
                 }} />
               ))}
             </div>
@@ -1383,12 +1361,14 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               <div className="icon-pulse" style={{
                 width: micState ? `${36 + clientVolume * 40}px` : '0px',
                 height: micState ? `${36 + clientVolume * 40}px` : '0px',
-                opacity: micState && clientVolume > 0.01 ? 0.3 : 0
+                opacity: micState && clientVolume > 0.02 ? 0.3 : 0,
+                transition: 'all 0.15s ease-out'
               }}></div>
               <div className="icon-pulse-ring" style={{
                 width: micState ? `${42 + clientVolume * 65}px` : '0px',
                 height: micState ? `${42 + clientVolume * 65}px` : '0px',
-                opacity: micState && clientVolume > 0.01 ? 0.5 : 0
+                opacity: micState && clientVolume > 0.02 ? 0.5 : 0,
+                transition: 'all 0.15s ease-out'
               }}></div>
               <i className={`ph-fill ph-microphone${micState ? '' : '-slash'}`}></i>
             </div>
@@ -2097,6 +2077,5 @@ export function useAudioOutputDevice() {
       console.error('Failed to set audio output device:', e);
     }
   }, []);
-
   return { deviceId, setOutputDevice, enumerateDevices };
 }
